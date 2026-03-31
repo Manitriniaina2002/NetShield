@@ -1,0 +1,191 @@
+Welcome to NetShield! 👋
+
+Merci d'avoir installé NetShield - Wi-Fi Security Audit Lab
+
+═══════════════════════════════════════════════════════════════
+
+📋 FICHIERS À LIRE (dans cet ordre)
+
+1. START HERE → SUMMARY.md
+   Résumé complet de ce qui a été créé
+
+2. QUICK START → QUICKSTART.md
+   Commencez en < 5 minutes
+
+3. INSTALLATION → INSTALL.md
+   Instructions installation détaillées
+
+4. UTILISATION → README.md
+   Documentation complète (7500+ mots)
+
+5. TECHNIQUE → ARCHITECTURE.md
+   Architecture et design system
+
+6. TESTING → TESTING.md
+   Vérifier que tout fonctionne
+
+═══════════════════════════════════════════════════════════════
+
+🚀 DÉMARRAGE RAPIDE
+
+Windows:
+  start.bat
+
+Linux/Mac:
+  chmod +x start.sh && ./start.sh
+
+Ou manuel:
+  Terminal 1: cd backend && python main.py
+  Terminal 2: cd frontend && npm run dev
+
+Puis ouvrez: http://localhost:3000
+
+═══════════════════════════════════════════════════════════════
+
+📂 STRUCTURE DU PROJET
+
+NetShield/
+├── backend/              API FastAPI (Python)
+├── frontend/             Interface React (JavaScript)
+├── README.md             Documentation (7500+ mots)
+├── SUMMARY.md            Ce qui a été créé
+├── QUICKSTART.md         Guide rapide
+├── INSTALL.md            Installation
+├── ARCHITECTURE.md       Technical details
+├── TESTING.md            Test checklist
+├── STRUCTURE.md          Vue complète
+└── start.bat/start.sh    Scripts démarrage
+
+═══════════════════════════════════════════════════════════════
+
+⚙️ REQUIREMENTS SYSTÈME
+
+✓ Python 3.9+
+✓ Node.js 16+
+✓ npm 7+
+
+Vérifier: python --version && node --version && npm --version
+
+═══════════════════════════════════════════════════════════════
+
+🎯 FONCTIONNALITÉS PRINCIPALES
+
+✅ Dashboard moderne            Interface professionnelle
+✅ Scan Wi-Fi intelligent       6 réseaux simulés réalistes
+✅ Détection vulnérabilités    25+ vulnerabilités identifiées
+✅ Recommandations auto        Mesures correctives contextuelles
+✅ Rapport PDF pro             Document formaté et prêt client
+✅ Export JSON                 Données structurées
+✅ Mode simulation sécurisé    Safe pour tout environnement
+✅ Mentions légales            Avertissements obligatoires
+
+═══════════════════════════════════════════════════════════════
+
+📊 DONNÉES INCLUSES
+
+6 réseaux Wi-Fi simulés:
+  🔴 FreeFi_Public (Open)       → CRITIQUE
+  🔴 CoffeShop_WiFi (WEP)       → CRITIQUE  
+  🟠 HomeNetwork (WPA)          → ÉLEVÉ
+  🟡 SecureOffice (WPA2)        → MOYEN
+  🟢 ModernHome (WPA3)          → SÉCURISÉ
+  🟡 HiddenNetwork (WPA2)       → MOYEN
+
+15-25 vulnérabilités identifiées
+10-15 recommandations générées
+Rapport PDF professionnel généré
+
+═══════════════════════════════════════════════════════════════
+
+✅ CHECKLIST INSTALLATION
+
+□ Python 3.9+ installé
+□ Node.js 16+ installé
+□ Dossier NetShield créé
+□ Backend dépendances: pip install -r requirements.txt
+□ Frontend dépendances: npm install
+□ Backend lancé: python main.py
+□ Frontend lancé: npm run dev
+□ Interface accessible: http://localhost:3000
+□ Premier scan réussi
+□ PDF généré avec succès
+
+═══════════════════════════════════════════════════════════════
+
+🔐 SÉCURITÉ & LÉGALITÉ
+
+⚠️  IMPORTANT:
+
+Cet outil est destiné UNIQUEMENT à :
+  ✅ Fins éducatives
+  ✅ Tests autorisés (avec consentement écrit)
+  ✅ Environnement contrôlé (lab, sandbox)
+
+Utilisation INTERDITE :
+  ❌ Accès non autorisé
+  ❌ Tests sans consentement
+  ❌ Activités illégales/malveillantes
+
+L'utilisateur assume l'entière responsabilité légale.
+
+═══════════════════════════════════════════════════════════════
+
+💡 PROCHAINES ÉTAPES
+
+1. Consulter SUMMARY.md pour aperçu complet
+2. Lancer l'application (start.bat ou start.sh)
+3. Faire un audit de test (cliquer scan)
+4. Générer rapports (PDF/JSON)
+5. Explorer la documentation
+6. Personnaliser si nécessaire
+
+═══════════════════════════════════════════════════════════════
+
+🆘 DÉPANNAGE RAPIDE
+
+Backend ne démarre?
+  → cd backend && pip install -r requirements.txt && python main.py
+
+Frontend ne charge pas?
+  → cd frontend && npm install && npm run dev
+
+Pas de connexion?
+  → Vérifier: http://localhost:8000/health (backend)
+  → Vérifier: http://localhost:3000 (frontend)
+
+Plus de détails? → Voir INSTALL.md
+
+═══════════════════════════════════════════════════════════════
+
+📞 RESSOURCES
+
+Local:
+  Frontend: http://localhost:3000
+  Backend: http://localhost:8000
+  API Docs: http://localhost:8000/api/docs
+
+Documentation:
+  README.md        - Documentation complète
+  ARCHITECTURE.md  - Design système
+  TESTING.md       - Test checklist
+  API_TESTS.md     - Exemples requêtes
+
+═══════════════════════════════════════════════════════════════
+
+🎉 PRÊT À COMMENCER!
+
+Exécutez (Windows):
+  start.bat
+
+Ou (Linux/Mac):
+  chmod +x start.sh && ./start.sh
+
+L'application s'ouvrira automatiquement.
+
+═══════════════════════════════════════════════════════════════
+
+NetShield v1.0.0 - Plateforme d'audit Wi-Fi professionnelle
+
+Bon audit! 🔐
+
+═══════════════════════════════════════════════════════════════
