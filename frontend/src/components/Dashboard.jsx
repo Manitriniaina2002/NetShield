@@ -4,6 +4,7 @@ import NetworkTable from './NetworkTable'
 import VulnerabilityPanel from './VulnerabilityPanel'
 import RecommendationPanel from './RecommendationPanel'
 import CommandPanel from './CommandPanel'
+import CrackingPanel from './CrackingPanel'
 import Header from './Header'
 
 export function Dashboard() {
@@ -15,76 +16,78 @@ export function Dashboard() {
   const [scanStats, setScanStats] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
   const [reportMode, setReportMode] = useState(false)
+  const [toast, setToast] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
 
-  // Charger les données simulées au démarrage
+  // Effectuer un scan réel au démarrage
   useEffect(() => {
-    loadDemoData()
+    performRealScan()
   }, [])
 
-  const loadDemoData = async () => {
+  const performRealScan = async () => {
+    setScanInProgress(true)
+    showToast('◆ Démarrage du scan Wi-Fi...', 'info')
     try {
-      // Utiliser les données simulées du backend
-      const response = await wifiAPI.scanNetworks(5, 'Demo Scan')
-      setNetworks(response.data.networks || [])
+      console.log('◆ Démarrage d\'un scan Wi-Fi réel...')
+      const response = await wifiAPI.scanNetworks(15, 'Real Scan')
+      
+      if (response.data.networks && response.data.networks.length > 0) {
+        console.log(`✓ ${response.data.networks.length} réseaux détectés`)
+        setNetworks(response.data.networks)
+        showToast(`✓ ${response.data.networks.length} réseaux détectés`, 'success')
+        
+        // Analyser automatiquement les réseaux détectés
+        await analyzeNetworks(response.data.networks)
+      } else {
+        console.warn('⚠ Aucun réseau détecté lors du scan')
+        showToast('⚠ Aucun réseau détecté', 'warning')
+        setNetworks([])
+      }
+      
+      // Show scan mode
+      const scanMode = response.data.mode || 'simulation'
+      if (scanMode === 'simulation_fallback') {
+        showToast('ⓘ Scan en mode simulation (fallback)', 'warning')
+      }
+      
+      setScanStats({
+        total: response.data.networks_found || 0,
+        timestamp: new Date().toLocaleTimeString('fr-FR')
+      })
     } catch (error) {
-      console.error('Erreur lors du chargement des données:', error)
-      // Charger manuellement las données de test
-      setNetworks([
-        {
-          ssid: 'FreeFi_Public',
-          bssid: 'AA:11:22:33:44:55',
-          channel: 6, frequency: '2.4GHz', security: 'Open',
-          signal_strength: -45, signal_percentage: 75, clients: 12
-        },
-        {
-          ssid: 'CoffeShop_WiFi',
-          bssid: 'BB:22:33:44:55:66',
-          channel: 11, frequency: '2.4GHz', security: 'WEP',
-          signal_strength: -55, signal_percentage: 65, clients: 8
-        },
-        {
-          ssid: 'HomeNetwork',
-          bssid: 'CC:33:44:55:66:77',
-          channel: 1, frequency: '2.4GHz', security: 'WPA',
-          signal_strength: -35, signal_percentage: 85, clients: 5
-        },
-        {
-          ssid: 'SecureOffice',
-          bssid: 'DD:44:55:66:77:88',
-          channel: 48, frequency: '5GHz', security: 'WPA2',
-          signal_strength: -50, signal_percentage: 70, clients: 15
-        },
-        {
-          ssid: 'ModernHome',
-          bssid: 'EE:55:66:77:88:99',
-          channel: 36, frequency: '5GHz', security: 'WPA3',
-          signal_strength: -40, signal_percentage: 80, clients: 3
-        }
-      ])
+      console.error('✗ Erreur lors du scan réel:', error)
+      showToast('✗ Erreur lors du scan: ' + (error.response?.data?.detail || error.message), 'error')
+      setNetworks([])
+    } finally {
+      setScanInProgress(false)
     }
   }
 
   const handleScan = async () => {
     setScanInProgress(true)
+    showToast('◆ Démarrage d\'un scan...', 'info')
     try {
       const response = await wifiAPI.scanNetworks(10, 'Security Audit')
       setNetworks(response.data.networks || [])
       setScanStats({
         total: response.data.networks_found,
-        critical: response.data.networks_found,
-        timestamp: new Date().toLocaleTimeString()
+        timestamp: new Date().toLocaleTimeString('fr-FR')
       })
+      showToast(`✓ ${response.data.networks_found} réseaux trouvés`, 'success')
       // Analyser automatiquement
       await analyzeNetworks(response.data.networks)
     } catch (error) {
       console.error('Erreur lors du scan:', error)
+      showToast('✗ Erreur lors du scan', 'error')
     } finally {
       setScanInProgress(false)
     }
   }
 
   const analyzeNetworks = async (nets) => {
+    setAnalyzing(true)
     try {
+      showToast('◆ Analyse en cours...', 'info')
       const result = await wifiAPI.analyzeBatch(nets)
       setVulnerabilities(result.data.vulnerabilities || [])
       
@@ -94,14 +97,23 @@ export function Dashboard() {
         nets
       )
       setRecommendations(recsResponse.data || [])
+      showToast('✓ Analyse completée', 'success')
     } catch (error) {
       console.error('Erreur lors de l\'analyse:', error)
+      showToast('✗ Erreur lors de l\'analyse', 'error')
+    } finally {
+      setAnalyzing(false)
     }
+  }
+
+  const showToast = (message, type = 'info') => {
+    setToast({ message, type })
+    setTimeout(() => setToast(null), 3000)
   }
 
   const handleSelectNetwork = async (network) => {
     setSelectedNetwork(network)
-    setActiveTab('details')
+    setActiveTab('cracking')
   }
 
   const getRiskScore = () => {
@@ -113,6 +125,7 @@ export function Dashboard() {
 
   const generatePDF = async () => {
     try {
+      showToast('▦ Génération du rapport PDF...', 'info')
       const report = {
         report_title: 'Audit Sécurité Wi-Fi - NetShield',
         project_name: 'Audit Complet',
@@ -128,7 +141,7 @@ export function Dashboard() {
         risk_assessment: getRiskScore() > 70 ? 'Risque ÉLEVÉ' : 'Risque MODÉRÉ',
         overall_risk_score: getRiskScore(),
         methodology: 'Scan passif avec simulation d\'attaques',
-        testing_period: new Date().toLocaleDateString()
+        testing_period: new Date().toLocaleDateString('fr-FR')
       }
       
       const response = await wifiAPI.generatePDF(report)
@@ -138,60 +151,90 @@ export function Dashboard() {
       link.setAttribute('download', `netshield_report_${Date.now()}.pdf`)
       document.body.appendChild(link)
       link.click()
+      link.remove()
+      showToast('✓ Rapport PDF téléchargé', 'success')
     } catch (error) {
-      alert('Erreur lors de la génération du PDF')
+      console.error('Erreur PDF:', error)
+      showToast('✗ Erreur lors de la génération du PDF', 'error')
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div className="min-h-screen bg-gradient-to-br from-white via-gray-50 to-gray-100">
       <Header />
 
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-4 right-4 p-4 rounded-lg font-mono font-semibold text-sm z-50 animate-pulse ${
+          toast.type === 'success' ? 'bg-[#10b981]/10 border border-[#10b981]/40 text-[#059669]' :
+          toast.type === 'error' ? 'bg-[#ef4444]/10 border border-[#ef4444]/40 text-[#dc2626]' :
+          toast.type === 'warning' ? 'bg-[#f59e0b]/10 border border-[#f59e0b]/40 text-[#d97706]' :
+          'bg-[#3b82f6]/10 border border-[#3b82f6]/40 text-[#1d4ed8]'
+        }`}>
+          {toast.message}
+        </div>
+      )}
+
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Dashboard Summary */}
+        {/* Dashboard Summary - Green Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="card">
-            <p className="text-gray-400 text-sm">Réseaux Détectés</p>
-            <p className="text-3xl font-bold text-blue-400">{networks.length}</p>
+          <div className="card border-l-4 border-l-[#22c55e] hover:border-l-[#4ade80]">
+            <p className="text-[#6b7280] text-sm font-mono uppercase tracking-wide">Réseaux Détectés</p>
+            <p className="text-4xl font-bold text-[#22c55e] mt-2">{networks.length}</p>
+            <div className="w-full h-1 bg-[#e5e7eb] rounded-full mt-3 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-[#22c55e] to-[#4ade80]" style={{width: `${(networks.length / 20) * 100}%`}}></div>
+            </div>
           </div>
           
-          <div className="card">
-            <p className="text-gray-400 text-sm">Vulnérabilités</p>
-            <p className="text-3xl font-bold text-red-400">{vulnerabilities.length}</p>
+          <div className="card border-l-4 border-l-[#ef4444] hover:border-l-[#f87171]">
+            <p className="text-[#6b7280] text-sm font-mono uppercase tracking-wide">Vulnérabilités</p>
+            <p className="text-4xl font-bold text-[#ef4444] mt-2">{vulnerabilities.length}</p>
+            <div className="w-full h-1 bg-[#e5e7eb] rounded-full mt-3 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-[#ef4444] to-[#f87171]" style={{width: `${(vulnerabilities.length / 50) * 100}%`}}></div>
+            </div>
           </div>
           
-          <div className="card">
-            <p className="text-gray-400 text-sm">Recommandations</p>
-            <p className="text-3xl font-bold text-yellow-400">{recommendations.length}</p>
+          <div className="card border-l-4 border-l-[#f59e0b] hover:border-l-[#fbbf24]">
+            <p className="text-[#6b7280] text-sm font-mono uppercase tracking-wide">Recommandations</p>
+            <p className="text-4xl font-bold text-[#f59e0b] mt-2">{recommendations.length}</p>
+            <div className="w-full h-1 bg-[#e5e7eb] rounded-full mt-3 overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-[#f59e0b] to-[#fbbf24]" style={{width: `${(recommendations.length / 30) * 100}%`}}></div>
+            </div>
           </div>
           
-          <div className="card">
-            <p className="text-gray-400 text-sm">Score de Risque</p>
-            <p className={`text-3xl font-bold ${getRiskScore() > 70 ? 'text-red-400' : 'text-yellow-400'}`}>
-              {getRiskScore().toFixed(0)}/100
+          <div className={`card border-l-4 ${getRiskScore() > 70 ? 'border-l-[#ef4444]' : 'border-l-[#f59e0b]'}`}>
+            <p className="text-[#6b7280] text-sm font-mono uppercase tracking-wide">Score de Risque</p>
+            <p className={`text-4xl font-bold mt-2 ${getRiskScore() > 70 ? 'text-[#ef4444]' : 'text-[#f59e0b]'}`}>
+              {getRiskScore().toFixed(0)}<span className="text-xl">/100</span>
             </p>
+            <div className="w-full h-1 bg-[#e5e7eb] rounded-full mt-3 overflow-hidden">
+              <div className={`h-full ${getRiskScore() > 70 ? 'bg-[#ef4444]' : 'bg-[#f59e0b]'}`} style={{width: `${getRiskScore()}%`}}></div>
+            </div>
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-4 mb-6 border-b border-gray-700">
-          {['overview', 'vulnerabilities', 'recommendations', 'commands', 'report'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-6 py-3 font-semibold transition-colors border-b-2 ${
-                activeTab === tab
-                  ? 'text-blue-400 border-blue-400'
-                  : 'text-gray-400 border-transparent hover:text-white'
-              }`}
-            >
-              {tab === 'overview' && 'Vue d\'ensemble'}
-              {tab === 'vulnerabilities' && 'Vulnérabilités'}
-              {tab === 'recommendations' && 'Recommandations'}
-              {tab === 'commands' && '⚙️ Commandes'}
-              {tab === 'report' && 'Rapport'}
-            </button>
-          ))}
+        {/* Tabs - Light Theme Style */}
+        <div className="mb-6">
+          <div className="flex gap-1 border-b border-[#e5e7eb] overflow-x-auto pb-0">
+            {['overview', 'vulnerabilities', 'recommendations', 'cracking', 'commands', 'report'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-4 font-mono text-sm font-semibold transition-all whitespace-nowrap border-b-2 ${
+                  activeTab === tab
+                    ? 'text-[#22c55e] border-[#22c55e] bg-[#22c55e]/5'
+                    : 'text-[#6b7280] border-transparent hover:text-[#1f2937] hover:border-[#22c55e]/30'
+                }`}
+              >
+                {tab === 'overview' && '◘ Vue d\'ensemble'}
+                {tab === 'vulnerabilities' && '◆ Vulnérabilités'}
+                {tab === 'recommendations' && '◗ Recommandations'}
+                {tab === 'cracking' && '◇ Craquage'}
+                {tab === 'commands' && '⚙ Commandes'}
+                {tab === 'report' && '▦ Rapport'}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Main Content */}
@@ -202,16 +245,28 @@ export function Dashboard() {
               <div className="flex gap-4">
                 <button
                   onClick={handleScan}
-                  disabled={scanInProgress}
-                  className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                    scanInProgress
-                      ? 'bg-gray-600 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700'
+                  disabled={scanInProgress || analyzing}
+                  className={`px-6 py-3 rounded-lg font-mono font-bold transition-all flex items-center gap-2 ${
+                    scanInProgress || analyzing
+                      ? 'bg-[#e5e7eb] text-[#9ca3af] cursor-not-allowed'
+                      : 'bg-gradient-to-r from-[#22c55e] to-[#16a34a] text-white hover:from-[#4ade80] hover:to-[#22c55e] shadow-lg hover:shadow-[0_0_20px_rgba(34,197,94,0.3)]'
                   }`}
                 >
-                  {scanInProgress ? '⏳ Scan en cours...' : '🔍 Démarrer un Scan'}
+                  {scanInProgress ? '◌ Scan en cours...' : analyzing ? '◆ Analyse en cours...' : '◆ Démarrer un Scan'}
                 </button>
               </div>
+
+              {analyzing && (
+                <div className="card bg-gradient-to-br from-[#dcfce7]/40 to-[#f0fdf4]/40 border border-[#22c55e]/30">
+                  <div className="flex items-center gap-4 p-4">
+                    <div className="animate-spin">⚙</div>
+                    <div>
+                      <p className="text-[#22c55e] font-bold font-mono">Analyse en cours...</p>
+                      <p className="text-[#6b7280] text-sm font-mono">Vulnérabilités et recommandations</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <NetworkTable networks={networks} onSelectNetwork={handleSelectNetwork} />
             </>
@@ -227,6 +282,11 @@ export function Dashboard() {
             <RecommendationPanel recommendations={recommendations} />
           )}
 
+          {/* Cracking Tab */}
+          {activeTab === 'cracking' && (
+            <CrackingPanel selectedNetwork={selectedNetwork} vulnerabilities={vulnerabilities} />
+          )}
+
           {/* Commands Tab */}
           {activeTab === 'commands' && (
             <CommandPanel />
@@ -235,21 +295,25 @@ export function Dashboard() {
           {/* Report Tab */}
           {activeTab === 'report' && (
             <div className="card">
-              <h2 className="text-2xl font-bold mb-6 text-white">Générer un Rapport</h2>
+              <h2 className="text-2xl font-bold mb-6 text-[#22c55e] font-mono">⬜ Générer un Rapport</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <button
                   onClick={generatePDF}
                   disabled={networks.length === 0}
-                  className="p-6 bg-blue-900 hover:bg-blue-800 disabled:bg-gray-700 rounded-lg transition-colors text-center"
+                  className={`p-6 rounded-lg transition-all border border-[#e5e7eb] hover:border-[#22c55e] ${
+                    networks.length === 0 
+                      ? 'bg-[#f3f4f6] text-[#9ca3af] cursor-not-allowed' 
+                      : 'bg-white hover:bg-[#f9fafb] text-[#1f2937]'
+                  }`}
                 >
-                  <p className="text-2xl mb-2">📄</p>
-                  <p className="font-semibold">Générer PDF</p>
-                  <p className="text-sm text-gray-400 mt-2">Rapport professionnel complet</p>
+                  <p className="text-3xl mb-2">✑</p>
+                  <p className="font-semibold font-mono">Générer PDF</p>
+                  <p className="text-xs text-[#6b7280] mt-2">Rapport professionnel complet</p>
                 </button>
 
                 <button
-                  className="p-6 bg-green-900 hover:bg-green-800 rounded-lg transition-colors text-center"
+                  className="p-6 bg-white hover:bg-[#f9fafb] rounded-lg transition-all text-center border border-[#e5e7eb] hover:border-[#22c55e]"
                   onClick={() => {
                     const report = {
                       networks,
@@ -263,41 +327,41 @@ export function Dashboard() {
                     link.click()
                   }}
                 >
-                  <p className="text-2xl mb-2">📋</p>
-                  <p className="font-semibold">Exporter JSON</p>
-                  <p className="text-sm text-gray-400 mt-2">Données structurées</p>
+                  <p className="text-3xl mb-2">↑</p>
+                  <p className="font-semibold font-mono text-[#1f2937]">Exporter JSON</p>
+                  <p className="text-xs text-[#6b7280] mt-2">Données structurées</p>
                 </button>
 
                 <button
-                  className="p-6 bg-purple-900 hover:bg-purple-800 rounded-lg transition-colors text-center"
+                  className="p-6 bg-white hover:bg-[#f9fafb] rounded-lg transition-all text-center border border-[#e5e7eb] hover:border-[#22c55e]"
                 >
-                  <p className="text-2xl mb-2">📊</p>
-                  <p className="font-semibold">Aperçu Rapport</p>
-                  <p className="text-sm text-gray-400 mt-2">Vérifier avant génération</p>
+                  <p className="text-3xl mb-2">⬜</p>
+                  <p className="font-semibold font-mono text-[#1f2937]">Aperçu Rapport</p>
+                  <p className="text-xs text-[#6b7280] mt-2">Vérifier avant génération</p>
                 </button>
               </div>
 
               {/* Rapport Summary */}
-              <div className="mt-8 p-6 bg-gray-800 rounded-lg border border-gray-700">
-                <h3 className="text-lg font-bold text-white mb-4">Résumé du Rapport</h3>
+              <div className="mt-8 p-6 bg-gradient-to-br from-white to-[#f9fafb] rounded-lg border border-[#e5e7eb] border-l-4 border-l-[#22c55e]">
+                <h3 className="text-lg font-bold text-[#22c55e] mb-4 font-mono">⬜ Résumé du Rapport</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-400">Total Réseaux</p>
-                    <p className="text-xl font-bold text-white">{networks.length}</p>
+                    <p className="text-[#9ca3af] font-mono text-xs uppercase">Total Réseaux</p>
+                    <p className="text-2xl font-bold text-[#33cc00]">{networks.length}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Vulnérabilités</p>
-                    <p className="text-xl font-bold text-red-400">{vulnerabilities.length}</p>
+                    <p className="text-[#9ca3af] font-mono text-xs uppercase">Vulnérabilités</p>
+                    <p className="text-2xl font-bold text-[#ef4444]">{vulnerabilities.length}</p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Critiques</p>
-                    <p className="text-xl font-bold text-red-300">
+                    <p className="text-[#9ca3af] font-mono text-xs uppercase">Critiques</p>
+                    <p className="text-2xl font-bold text-[#f87171]">
                       {vulnerabilities.filter(v => v.severity === 'Critique').length}
                     </p>
                   </div>
                   <div>
-                    <p className="text-gray-400">Recommandations</p>
-                    <p className="text-xl font-bold text-yellow-400">{recommendations.length}</p>
+                    <p className="text-[#9ca3af] font-mono text-xs uppercase">Recommandations</p>
+                    <p className="text-2xl font-bold text-[#f59e0b]">{recommendations.length}</p>
                   </div>
                 </div>
               </div>

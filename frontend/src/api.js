@@ -33,6 +33,13 @@ export const wifiAPI = {
   analyzeBatch: (networks) =>
     api.post('/vulnerabilities/analyze-batch', networks),
   
+  // Cracking strategies
+  getCrackingStrategy: (bssid, network) =>
+    api.post(`/vulnerabilities/cracking-strategy/${bssid}`, network),
+  
+  getCrackingStrategiesBatch: (networks) =>
+    api.post('/vulnerabilities/cracking-strategies-batch', networks),
+  
   // Recommandations
   generateRecommendations: (vulnerabilities, networks) =>
     api.post('/recommendations/generate', { vulnerabilities, networks }),
@@ -52,7 +59,40 @@ export const wifiAPI = {
     api.get('/commands/allowed'),
   
   executeCommand: (command, args = null) =>
-    api.post('/commands/execute', null, { params: { command, args } })
+    api.post('/commands/execute', null, { params: { command, args } }),
+  
+  // Cracking
+  getCrackingStatus: () =>
+    api.get('/cracking/status'),
+  
+  getAvailableWordlists: () =>
+    api.get('/cracking/wordlists'),
+  
+  getCrackingMethods: () =>
+    api.get('/cracking/methods'),
+  
+  startCrackingJob: (networkBssid, method = 'aircrack-ng', wordlist = 'academic', gpuEnabled = false) =>
+    api.post('/cracking/start', {
+      network_bssid: networkBssid,
+      method,
+      wordlist,
+      gpu_enabled: gpuEnabled
+    }),
+  
+  getJobStatus: (jobId) =>
+    api.get(`/cracking/job/${jobId}`),
+  
+  listActiveJobs: () =>
+    api.get('/cracking/jobs'),
+  
+  pauseJob: (jobId) =>
+    api.post(`/cracking/job/${jobId}/pause`),
+  
+  cancelJob: (jobId) =>
+    api.post(`/cracking/job/${jobId}/cancel`),
+  
+  getHandshakeCaptureGuide: () =>
+    api.get('/cracking/handshake-capture-guide')
 }
 
 export default api

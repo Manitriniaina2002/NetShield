@@ -17,7 +17,8 @@ class ScanResult(BaseModel):
     networks: List[WiFiNetwork] = Field(default_factory=list)
     scan_duration: int = Field(0, description="Durée du scan en secondes")
     interface_used: Optional[str] = Field(None, description="Interface réseau utilisée")
-    mode: str = Field("simulation", description="Mode du scan (simulation/monitor)")
+    mode: str = Field("simulation", description="Mode du scan (simulation/real/simulation_fallback)")
+    message: Optional[str] = Field(None, description="Message de statut du scan")
     
     class Config:
         json_schema_extra = {

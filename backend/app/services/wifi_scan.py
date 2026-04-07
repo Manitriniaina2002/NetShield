@@ -138,10 +138,18 @@ class WiFiScanService:
         """Scan des reseaux Wi-Fi reels sous Windows via netsh."""
         await asyncio.sleep(min(duration_seconds / 10, 1))
 
-        output = await WiFiScanService._run_command(
-            ["netsh", "wlan", "show", "networks", "mode=Bssid"],
-            timeout=max(15, duration_seconds + 5),
-        )
+        try:
+            output = await WiFiScanService._run_command(
+                ["netsh", "wlan", "show", "networks", "mode=Bssid"],
+                timeout=max(15, duration_seconds + 5),
+            )
+        except Exception as e:
+            raise RuntimeError(
+                f"Windows Wi-Fi scan failed: {str(e)}. "
+                "Ensure: 1) Administrator privileges, "
+                "2) Wi-Fi adapter is enabled, "
+                "3) netsh is available. Falling back to simulation mode."
+            )
 
         networks: List[WiFiNetwork] = []
         current_ssid = ""

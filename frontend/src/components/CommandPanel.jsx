@@ -53,7 +53,7 @@ export function CommandPanel() {
   const handleAuthSuccess = (newSessionId, authData) => {
     setSessionId(newSessionId)
     setIsAuthenticated(true)
-    setOutput(`✅ Authentification réussie!\n${authData.message}`)
+    setOutput(`✓ Authentification réussie!\n${authData.message}`)
     
     // Exécuter la commande après authentification
     setTimeout(() => {
@@ -117,21 +117,21 @@ export function CommandPanel() {
     <div className="space-y-6">
       
       {/* Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
+      <div className="card">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              ⚙️ Panneau de Commandes Système
+            <h2 className="text-2xl font-bold text-[#33cc00] font-mono uppercase tracking-wider flex items-center gap-2">
+              ⚙ Panneau de Commandes Système
             </h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
+            <p className="text-[#9ca3af] mt-1 font-mono">
               Exécution sécurisée de commandes système (avec authentification admin)
             </p>
           </div>
           
           {isAuthenticated && (
-            <div className="bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200 px-4 py-2 rounded-lg">
-              <div className="text-sm font-semibold">✅ Authentifié</div>
-              <div className="text-xs mt-1">Session active (1 heure)</div>
+            <div className="bg-[#10b981]/20 border border-[#10b981]/40 text-[#34d399] px-4 py-2 rounded-lg">
+              <div className="text-sm font-semibold font-mono">✓ Authentifié</div>
+              <div className="text-xs mt-1 font-mono">Session active (1 heure)</div>
             </div>
           )}
         </div>
@@ -141,28 +141,28 @@ export function CommandPanel() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Sélecteur de commande */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            🔧 Sélectionnez une Commande
+        <div className="lg:col-span-2 card">
+          <h3 className="text-lg font-bold text-[#33cc00] mb-4 font-mono uppercase tracking-wider">
+            ⚙ Sélectionnez une Commande
           </h3>
 
           {/* Liste des commandes */}
-          <div className="space-y-2 mb-4">
+          <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
             {commands.map((cmd) => (
               <button
                 key={cmd.name}
                 onClick={() => setSelectedCommand(cmd.name)}
-                className={`w-full text-left px-4 py-3 rounded-lg border-2 transition
+                className={`w-full text-left px-4 py-3 rounded-lg border-2 transition font-mono
                   ${selectedCommand === cmd.name
-                    ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                    : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                    ? 'border-[#33cc00] bg-[#33cc00]/10'
+                    : 'border-[#2a2f4a] hover:border-[#33cc00]/50'
                   }
                 `}
               >
-                <div className="font-semibold text-gray-900 dark:text-white">
+                <div className={`font-bold ${selectedCommand === cmd.name ? 'text-[#33cc00]' : 'text-[#e5e7eb]'}`}>
                   {cmd.name}
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+                <div className="text-sm text-[#9ca3af]">
                   {cmd.description}
                 </div>
               </button>
@@ -171,8 +171,8 @@ export function CommandPanel() {
 
           {/* Champ arguments */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              📝 Arguments (optionnel)
+            <label className="block text-sm font-bold text-[#33cc00] mb-2 font-mono uppercase">
+              ✑ Arguments (optionnel)
             </label>
             <input
               type="text"
@@ -180,9 +180,9 @@ export function CommandPanel() {
               onChange={(e) => setCommandArgs(e.target.value)}
               placeholder="ex: wlan0 start"
               disabled={!selectedCommand || loading}
-              className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                bg-white dark:bg-slate-700 text-gray-900 dark:text-white
-                focus:ring-2 focus:ring-blue-500 focus:border-transparent
+              className="w-full px-4 py-2 border border-[#2a2f4a] rounded-lg
+                bg-[#151a3a] text-[#e5e7eb] font-mono
+                focus:ring-2 focus:ring-[#33cc00] focus:border-[#33cc00] focus:outline-none
                 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
@@ -192,17 +192,17 @@ export function CommandPanel() {
             <button
               onClick={handleExecuteClick}
               disabled={!selectedCommand || loading}
-              className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition
-                disabled:opacity-50 disabled:cursor-not-allowed font-medium flex items-center justify-center gap-2"
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-[#33cc00] to-[#28a300] text-[#0a0e27] rounded-lg transition
+                disabled:opacity-50 disabled:cursor-not-allowed font-bold flex items-center justify-center gap-2 font-mono"
             >
               {loading ? (
                 <>
-                  <span className="animate-spin">⏳</span>
+                  <span className="animate-spin">◌</span>
                   Exécution...
                 </>
               ) : (
                 <>
-                  ▶️ Exécuter
+                  ▶ Exécuter
                 </>
               )}
             </button>
@@ -210,53 +210,53 @@ export function CommandPanel() {
             {isAuthenticated && (
               <button
                 onClick={handleLogout}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition font-medium"
+                className="px-4 py-2 bg-[#ef4444] hover:bg-[#f87171] text-white rounded-lg transition font-bold font-mono"
               >
-                🚪 Déconnecter
+                ⌂ Déconnecter
               </button>
             )}
           </div>
         </div>
 
         {/* Informations */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            ℹ️ Informations
+        <div className="card">
+          <h3 className="text-lg font-bold text-[#33cc00] mb-4 font-mono uppercase">
+            ⓘ Informations
           </h3>
           
           <div className="space-y-3 text-sm">
-            <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded">
-              <div className="font-semibold text-blue-900 dark:text-blue-200">
-                🔐 Sécurité
+            <div className="bg-[#1a5f4a]/20 border border-[#10b981]/30 p-3 rounded font-mono">
+              <div className="font-bold text-[#34d399]">
+                ◇ Sécurité
               </div>
-              <p className="text-blue-800 dark:text-blue-300 text-xs mt-1">
+              <p className="text-[#a7f3d0] text-xs mt-1">
                 Authentification admin requise pour chaque exécution
               </p>
             </div>
 
-            <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded">
-              <div className="font-semibold text-yellow-900 dark:text-yellow-200">
-                📋 Whitelist
+            <div className="bg-[#5f4a1a]/20 border border-[#f59e0b]/30 p-3 rounded font-mono">
+              <div className="font-bold text-[#fbbf24]">
+                ▦ Whitelist
               </div>
-              <p className="text-yellow-800 dark:text-yellow-300 text-xs mt-1">
+              <p className="text-[#fde047] text-xs mt-1">
                 Seules les commandes sûres sont autorisées
               </p>
             </div>
 
-            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded">
-              <div className="font-semibold text-green-900 dark:text-green-200">
-                ✅ Statut
+            <div className="bg-[#1a5f3a]/20 border border-[#33cc00]/30 p-3 rounded font-mono">
+              <div className="font-bold text-[#33cc00]">
+                ✓ Statut
               </div>
-              <p className="text-green-800 dark:text-green-300 text-xs mt-1">
-                {isAuthenticated ? '✅ Authentifié' : '⏳ Non authentifié'}
+              <p className="text-[#4dff00] text-xs mt-1">
+                {isAuthenticated ? '✓ Authentifié' : '◌ Non authentifié'}
               </p>
             </div>
 
-            <div className="bg-gray-50 dark:bg-gray-900/20 p-3 rounded">
-              <div className="font-semibold text-gray-900 dark:text-gray-200">
+            <div className="bg-[#2a2f4a]/50 border border-[#9ca3af]/30 p-3 rounded font-mono">
+              <div className="font-bold text-[#9ca3af]">
                 ⏱️ Session
               </div>
-              <p className="text-gray-800 dark:text-gray-300 text-xs mt-1">
+              <p className="text-[#b8bcc6] text-xs mt-1">
                 {isAuthenticated ? '1 heure restante' : 'Non connecté'}
               </p>
             </div>
@@ -266,23 +266,23 @@ export function CommandPanel() {
 
       {/* Messages d'erreur */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-4">
-          <div className="text-sm text-red-800 dark:text-red-200">
-            <span className="font-semibold">❌ Erreur:</span> {error}
+        <div className="bg-[#ef4444]/15 border border-[#ef4444]/40 rounded-lg p-4">
+          <div className="text-sm text-[#fca5a5] font-mono">
+            <span className="font-bold">✕ Erreur:</span> {error}
           </div>
         </div>
       )}
 
       {/* Output */}
       {output && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            📤 Résultat
+        <div className="card">
+          <h3 className="text-lg font-bold text-[#33cc00] mb-4 font-mono uppercase">
+            ↑ Résultat
           </h3>
-          <div className="bg-gray-50 dark:bg-slate-900 p-4 rounded-lg font-mono text-sm
-            text-gray-900 dark:text-gray-100 overflow-x-auto max-h-96 overflow-y-auto">
+          <div className="bg-[#0a0e27]/80 p-4 rounded-lg font-mono text-sm
+            text-[#33cc00] overflow-x-auto max-h-96 overflow-y-auto border border-[#2a2f4a]">
             {output.split('\n').map((line, idx) => (
-              <div key={idx}>{line}</div>
+              <div key={idx} className="leading-relaxed">{line}</div>
             ))}
           </div>
         </div>

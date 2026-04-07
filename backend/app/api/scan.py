@@ -28,13 +28,26 @@ async def scan_networks(
     """
     try:
         settings = get_settings()
-
-        # Exécuter le scan
-        networks = await WiFiScanService.scan_networks(duration_seconds=duration)
-
         system_name = platform.system().lower()
         interface_name = "Wi-Fi" if system_name == "windows" else "wlan0"
-        scan_mode = "simulation" if settings.simulation_mode else "real"
+        
+        # Essayer un scan réel en premier
+        scan_mode = "simulation"
+        networks = []
+        error_msg = None
+        
+        if not settings.simulation_mode:
+            try:
+                networks = await WiFiScanService.scan_networks(duration_seconds=duration)
+                scan_mode = "real"
+            except Exception as real_error:
+                # Fallback à la simulation avec message d'erreur
+                error_msg = f"Real mode error: {str(real_error)}"
+                print(f"[SCAN ERROR] {error_msg}")
+                networks = await WiFiScanService._scan_networks_simulated(duration_seconds=duration)
+                scan_mode = "simulation_fallback"
+        else:
+            networks = await WiFiScanService._scan_networks_simulated(duration_seconds=duration)
         
         # Créer le résultat du scan
         scan_result = ScanResult(
@@ -46,12 +59,15 @@ async def scan_networks(
             scan_duration=duration,
             interface_used=interface_name,
             mode=scan_mode,
+            message=f"Scan {scan_mode} completed. {error_msg if error_msg else 'Success'}"
         )
         
         return scan_result
     
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Scan error: {str(e)}")
 
 
 @router.get("/networks/{bssid}", response_model=dict)
