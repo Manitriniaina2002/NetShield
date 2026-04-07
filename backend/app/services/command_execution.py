@@ -1,305 +1,355 @@
-"""Services d'exécution de commandes sécurisée"""
-import subprocess
+"""Services d'execution de commandes securisee."""
 import asyncio
-import json
 import os
-import getpass
-from typing import Dict, Any, List, Optional
+import platform
+import shutil
+import time
+import uuid
+from typing import Any, Dict, List, Optional, Tuple
+
 from app.config import get_settings
 
 
 class CommandExecutionService:
-    """Service sécurisé d'exécution de commandes système"""
-    
-    # Commandes autorisées (whitelist)
+    """Service securise d'execution de commandes systeme."""
+
+    # Commandes logiques exposees a l'UI/API.
     ALLOWED_COMMANDS = {
-        "ifconfig": "Affiche les interfaces réseau",
-        "ip": "Commandes réseau avancées",
-        "airmon-ng": "Activer/désactiver le mode monitor",
-        "airodump-ng": "Scanner les réseaux Wi-Fi",
+        "ifconfig": "Afficher les interfaces reseau",
+        "ip": "Commandes reseau avancees",
+        "airmon-ng": "Activer/desactiver le mode monitor (Linux)",
+        "airodump-ng": "Scanner les reseaux Wi-Fi (Linux)",
         "ps": "Lister les processus",
-        "kill": "Terminer un processus"
+        "kill": "Terminer un processus",
     }
-    
-    # Stockage des sessions authentifiées (session_id -> timestamp)
-    AUTHENTICATED_SESSIONS: Dict[str, float] = {}
-    
-    # Durée de vie d'une session auth (en secondes)
+
+    # Sessions authentifiees: session_id -> metadata
+    AUTHENTICATED_SESSIONS: Dict[str, Dict[str, Any]] = {}
     SESSION_LIFETIME = 3600  # 1 heure
-    
+
     @staticmethod
-    async def verify_admin_auth(password: str, session_id: str = None) -> Dict[str, Any]:
-        """
-        Vérifie l'authentification administrateur
-        
-        Mode Simulation: Accepte tout mot de passe (min. 4 caractères)
-        Mode Réel Linux: Vérifie que le processus tourne en root (uid == 0)
-        Mode Réel Windows: Vérifie que l'utilisateur est admin
-        
-        Args:
-            password: Mot de passe administrateur
-            session_id: ID de session à créer
-            
-        Returns:
-            Succès de l'authentification et session ID
-        """
-        import time
-        import uuid
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        settings = get_settings()
-        
-        # En mode simulation, accepter tout mot de passe non vide
-        if settings.simulation_mode:
-            logger.info("Mode SIMULATION - Authentification par mot de passe")
-            if password and len(password) >= 4:
-                session_id = str(uuid.uuid4())
-                CommandExecutionService.AUTHENTICATED_SESSIONS[session_id] = time.time()
-                logger.info(f"✅ Authentification simulation réussie - Session: {session_id[:8]}...")
-                return {
-                    "success": True,
-                    "session_id": session_id,
-                    "message": "Authentification admin réussie (Mode Simulation)",
-                    "expires_in": CommandExecutionService.SESSION_LIFETIME,
-                    "mode": "simulation"
-                }
-            else:
-                logger.warning("❌ Mot de passe trop court pour authentification simulation")
-                return {
-                    "success": False,
-                    "error": "Mot de passe invalide (min. 4 caractères)",
-                    "mode": "simulation"
-                }
-        
-        # Mode réel: Vérifier les permissions root/admin
-        logger.info("Mode RÉEL - Vérification des permissions root/admin")
-        
-        # Vérifie si on est Linux/Unix
-        try:
-            current_uid = os.geteuid()
-            logger.info(f"Système Linux détecté - UID actuel: {current_uid}")
-            
-            if current_uid == 0:  # Nous sommes root
-                session_id = str(uuid.uuid4())
-                CommandExecutionService.AUTHENTICATED_SESSIONS[session_id] = time.time()
-                logger.info(f"✅ Authentification ROOT Linux réussie - Session: {session_id[:8]}...")
-                return {
-                    "success": True,
-                    "session_id": session_id,
-                    "is_root": True,
-                    "message": "Authentification ROOT réussie",
-                    "expires_in": CommandExecutionService.SESSION_LIFETIME,
-                    "mode": "real_linux"
-                }
-            else:
-                logger.error(f"❌ Processus ne tourne pas en root (uid={current_uid})")
-                return {
-                    "success": False,
-                    "error": f"Authentification échouée - Le processus doit tourner en root (uid=0). UID courant: {current_uid}",
-                    "mode": "real_linux",
-                    "current_uid": current_uid
-                }
-        
-        except AttributeError:
-            # Windows - utiliser la méthode Windows
-            logger.info("Système Windows détecté")
+    def _platform_name() -> str:
+        return platform.system().lower()
+
+    @staticmethod
+    def _is_admin_context() -> bool:
+        """Retourne True si le processus a des privileges admin/root."""
+        if os.name == "nt":
             try:
                 import ctypes
-                is_admin = ctypes.windll.shell.IsUserAnAdmin()
-                logger.info(f"Statut admin: {is_admin}")
-                
-                if is_admin:
-                    session_id = str(uuid.uuid4())
-                    CommandExecutionService.AUTHENTICATED_SESSIONS[session_id] = time.time()
-                    logger.info(f"✅ Authentification ADMIN Windows réussie - Session: {session_id[:8]}...")
-                    return {
-                        "success": True,
-                        "session_id": session_id,
-                        "is_admin": True,
-                        "message": "Authentification ADMIN réussie",
-                        "expires_in": CommandExecutionService.SESSION_LIFETIME,
-                        "mode": "real_windows"
-                    }
-                else:
-                    logger.error("❌ L'utilisateur n'a pas les droits administrateur")
-                    return {
-                        "success": False,
-                        "error": "Authentification échouée - Requiert les droits administrateur Windows",
-                        "mode": "real_windows"
-                    }
-            except Exception as e:
-                logger.error(f"❌ Erreur lors de la vérification Windows: {str(e)}")
+
+                return bool(ctypes.windll.shell32.IsUserAnAdmin())
+            except Exception:
+                return False
+
+        try:
+            return os.geteuid() == 0
+        except AttributeError:
+            return False
+
+    @staticmethod
+    def _session_expired(created_at: float) -> bool:
+        return (time.time() - created_at) > CommandExecutionService.SESSION_LIFETIME
+
+    @staticmethod
+    def get_runtime_info() -> Dict[str, Any]:
+        """Expose les infos de compatibilite de la plateforme courante."""
+        current_platform = CommandExecutionService._platform_name()
+        linux_only = ["airmon-ng", "airodump-ng"]
+
+        return {
+            "platform": current_platform,
+            "is_admin_context": CommandExecutionService._is_admin_context(),
+            "simulation_mode": get_settings().simulation_mode,
+            "linux_only_commands": linux_only if current_platform == "windows" else [],
+        }
+
+    @staticmethod
+    async def verify_admin_auth(password: str) -> Dict[str, Any]:
+        """
+        Verifie l'authentification administrateur.
+
+        Mode simulation: tout mot de passe >= 4 caracteres.
+        Mode reel: le backend doit deja tourner avec privileges admin/root.
+        """
+        settings = get_settings()
+
+        if settings.simulation_mode:
+            if not password or len(password) < 4:
                 return {
                     "success": False,
-                    "error": f"Erreur lors de la vérification admin: {str(e)}",
-                    "mode": "real_windows"
+                    "error": "Mot de passe invalide (minimum 4 caracteres)",
+                    "mode": "simulation",
                 }
-        
-        except Exception as e:
-            logger.error(f"❌ Erreur inattendue: {str(e)}")
+
+            session_id = str(uuid.uuid4())
+            CommandExecutionService.AUTHENTICATED_SESSIONS[session_id] = {
+                "created_at": time.time(),
+                "platform": CommandExecutionService._platform_name(),
+                "mode": "simulation",
+            }
+
+            return {
+                "success": True,
+                "session_id": session_id,
+                "message": "Authentification admin reussie (mode simulation)",
+                "expires_in": CommandExecutionService.SESSION_LIFETIME,
+                "mode": "simulation",
+            }
+
+        if not CommandExecutionService._is_admin_context():
+            current_platform = CommandExecutionService._platform_name()
+            if current_platform == "windows":
+                reason = "Demarrez le backend avec 'Executer en tant qu'administrateur'."
+            else:
+                reason = "Demarrez le backend avec sudo/root (uid=0)."
+
             return {
                 "success": False,
-                "error": f"Erreur d'authentification: {str(e)}"
+                "error": f"Privileges insuffisants. {reason}",
+                "mode": "real",
+                "platform": current_platform,
             }
-    
+
+        session_id = str(uuid.uuid4())
+        CommandExecutionService.AUTHENTICATED_SESSIONS[session_id] = {
+            "created_at": time.time(),
+            "platform": CommandExecutionService._platform_name(),
+            "mode": "real",
+        }
+
+        return {
+            "success": True,
+            "session_id": session_id,
+            "message": "Authentification admin/root reussie",
+            "expires_in": CommandExecutionService.SESSION_LIFETIME,
+            "mode": "real",
+        }
+
     @staticmethod
     def verify_session(session_id: str) -> bool:
-        """
-        Vérifie si une session est valide et active
-        
-        Args:
-            session_id: ID de session à vérifier
-            
-        Returns:
-            True si la session est valide
-        """
-        import time
-        
-        if session_id not in CommandExecutionService.AUTHENTICATED_SESSIONS:
+        """Verifie si une session est valide et active."""
+        session = CommandExecutionService.AUTHENTICATED_SESSIONS.get(session_id)
+        if not session:
             return False
-        
-        # Vérifier que la session n'a pas expiré
-        session_time = CommandExecutionService.AUTHENTICATED_SESSIONS[session_id]
-        if time.time() - session_time > CommandExecutionService.SESSION_LIFETIME:
+
+        if CommandExecutionService._session_expired(session["created_at"]):
             del CommandExecutionService.AUTHENTICATED_SESSIONS[session_id]
             return False
-        
+
         return True
-    
+
+    @staticmethod
+    def _resolve_command(command: str, args: Optional[List[str]]) -> Tuple[str, List[str]]:
+        """Traduit les commandes logiques selon l'OS courant."""
+        current_platform = CommandExecutionService._platform_name()
+        normalized_args = list(args or [])
+
+        if current_platform == "windows":
+            windows_map = {
+                "ifconfig": "ipconfig",
+                "ip": "netsh",
+                "ps": "tasklist",
+                "kill": "taskkill",
+            }
+
+            if command in {"airmon-ng", "airodump-ng"}:
+                raise ValueError(
+                    f"La commande '{command}' est disponible uniquement sous Linux avec aircrack-ng."
+                )
+
+            executable = windows_map.get(command, command)
+
+            if executable == "taskkill" and normalized_args:
+                upper_args = [a.upper() for a in normalized_args]
+                if "/PID" not in upper_args and "/IM" not in upper_args:
+                    if normalized_args[0].isdigit():
+                        normalized_args = ["/PID", normalized_args[0], "/F"]
+
+            return executable, normalized_args
+
+        if command == "ifconfig":
+            if shutil.which("ifconfig"):
+                return "ifconfig", normalized_args
+
+            if shutil.which("ip"):
+                return "ip", ["addr"] + normalized_args
+
+            raise ValueError("Aucune commande reseau disponible: ni 'ifconfig' ni 'ip'.")
+
+        if command in {"ip", "ps", "kill", "airmon-ng", "airodump-ng"}:
+            if not shutil.which(command):
+                if command in {"airmon-ng", "airodump-ng"}:
+                    raise ValueError(
+                        f"La commande '{command}' est introuvable. Installez la suite aircrack-ng."
+                    )
+                raise ValueError(f"Commande introuvable sur ce systeme: {command}")
+
+        return command, normalized_args
+
     @staticmethod
     async def execute_command(
         command: str,
-        args: List[str] = None,
+        args: Optional[List[str]] = None,
         timeout: int = 30,
-        session_id: str = None
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """
-        Exécute une commande de manière sécurisée (simulation en mode laboratoire)
-        
-        Args:
-            command: Commande à exécuter
-            args: Arguments additionnels
-            timeout: Timeout en secondes
-            session_id: ID de session authentifiée
-            
-        Returns:
-            Résultat de l'exécution
-        """
+        """Execute une commande de maniere securisee."""
         settings = get_settings()
-        
-        # Vérifier l'authentification
+
         if not session_id or not CommandExecutionService.verify_session(session_id):
             return {
                 "success": False,
-                "error": "Authentification requise - Utilisez /api/commands/auth d'abord",
+                "error": "Authentification requise - utilisez /api/commands/auth.",
                 "code": 401,
-                "require_auth": True
+                "require_auth": True,
             }
-        
-        # Vérifier si la commande est autorisée
+
         if command not in CommandExecutionService.ALLOWED_COMMANDS:
             return {
                 "success": False,
-                "error": f"Commande non autorisée: {command}",
-                "code": 403
+                "error": f"Commande non autorisee: {command}",
+                "code": 403,
             }
-        
-        # Si on est en mode simulation, retourner des données simulées
+
         if settings.simulation_mode:
             return await CommandExecutionService._simulate_command(command, args)
-        
-        # Sinon, exécuter la commande réelle (avec restrictions)
+
         try:
-            cmd_list = [command] + (args or [])
-            
+            executable, normalized_args = CommandExecutionService._resolve_command(command, args)
+            cmd_list = [executable] + normalized_args
+
             process = await asyncio.create_subprocess_exec(
                 *cmd_list,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
-            
+
             try:
-                stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=timeout
-                )
+                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
             except asyncio.TimeoutError:
                 process.kill()
+                await process.communicate()
                 return {
                     "success": False,
-                    "error": "Commande timeout"
+                    "error": f"Timeout: commande non terminee apres {timeout}s",
+                    "code": 408,
                 }
-            
+
             return {
                 "success": process.returncode == 0,
-                "output": stdout.decode('utf-8', errors='ignore'),
-                "error": stderr.decode('utf-8', errors='ignore'),
-                "code": process.returncode
+                "output": stdout.decode("utf-8", errors="ignore"),
+                "error": stderr.decode("utf-8", errors="ignore"),
+                "code": process.returncode,
+                "command": " ".join(cmd_list),
+                "platform": CommandExecutionService._platform_name(),
             }
-        
+
+        except ValueError as e:
+            return {
+                "success": False,
+                "error": str(e),
+                "code": 400,
+                "platform": CommandExecutionService._platform_name(),
+            }
+        except FileNotFoundError as e:
+            return {
+                "success": False,
+                "error": f"Executable introuvable: {str(e)}",
+                "code": 404,
+                "platform": CommandExecutionService._platform_name(),
+            }
         except Exception as e:
             return {
                 "success": False,
-                "error": str(e)
+                "error": f"Erreur d'execution: {str(e)}",
+                "code": 500,
+                "platform": CommandExecutionService._platform_name(),
             }
-    
+
     @staticmethod
-    async def _simulate_command(command: str, args: List[str]) -> Dict[str, Any]:
-        """Simule l'exécution d'une commande"""
-        
+    async def _simulate_command(command: str, args: Optional[List[str]]) -> Dict[str, Any]:
+        """Simule l'execution d'une commande."""
+        current_platform = CommandExecutionService._platform_name()
+
         if command == "ifconfig":
+            if current_platform == "windows":
+                return {
+                    "success": True,
+                    "output": (
+                        "Windows IP Configuration\n\n"
+                        "Wireless LAN adapter Wi-Fi:\n"
+                        "   IPv4 Address. . . . . . . . . . . : 192.168.1.42\n"
+                        "   Subnet Mask . . . . . . . . . . . : 255.255.255.0\n"
+                        "   Default Gateway . . . . . . . . . : 192.168.1.1"
+                    ),
+                }
+
             return {
                 "success": True,
-                "output": """wlan0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
-        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255
-        inet6 fe80::a00:27ff:fe26:30c7  prefixlen 64  scopeid 0x20<link>
-        ether 08:00:27:26:30:c7  txqueuelen 1000  (Ethernet)
-        RX packets 1024  bytes 512000 (512.0 MB)
-        TX packets 512  bytes 256000 (256.0 MB)
-
-wlan0mon: flags=4098<BROADCAST,SIMPLEX,MULTICAST>  mtu 1500"""
+                "output": (
+                    "wlan0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500\n"
+                    "        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255\n"
+                    "        ether 08:00:27:26:30:c7  txqueuelen 1000"
+                ),
             }
-        
-        elif command == "airmon-ng":
+
+        if command == "airmon-ng":
             if args and args[0] == "start":
                 return {
                     "success": True,
-                    "output": f"Found 1 (0x)process: wlan0 and turn it into monitoring mode",
-                    "info": {"interface": "wlan0mon", "mode": "monitor"}
+                    "output": "Interface wlan0 basculee en mode monitor (simulation)",
+                    "info": {"interface": "wlan0mon", "mode": "monitor"},
                 }
-            elif args and args[0] == "stop":
+            if args and args[0] == "stop":
                 return {
                     "success": True,
-                    "output": "Stopped monitor mode",
-                    "info": { "interface": "wlan0", "mode": "managed"}
+                    "output": "Mode monitor desactive (simulation)",
+                    "info": {"interface": "wlan0", "mode": "managed"},
                 }
-        
-        elif command == "airodump-ng":
-            # Retourner des données de scan simulées
+
+        if command == "airodump-ng":
             return {
                 "success": True,
-                "output": "Scan terminé avec 6 réseaux détectés",
-                "networks": 6
+                "output": "Scan termine avec 6 reseaux detectes (simulation)",
+                "networks": 6,
             }
-        
-        elif command == "ps":
+
+        if command == "ps":
+            if current_platform == "windows":
+                return {
+                    "success": True,
+                    "output": (
+                        "Image Name                     PID Session Name        Session#    Mem Usage\n"
+                        "System Idle Process              0 Services                   0          8 K\n"
+                        "explorer.exe                  4024 Console                    1     85,420 K"
+                    ),
+                }
+
             return {
                 "success": True,
-                "output": """PID   USER     COMMAND
-1234  root     /sbin/wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant.conf
-5678  user     python wifi_scanner.py
-9012  root     /usr/sbin/hostapd -B /etc/hostapd.conf"""
+                "output": (
+                    "PID   USER     COMMAND\n"
+                    "1234  root     /sbin/wpa_supplicant -B -i wlan0\n"
+                    "5678  user     python wifi_scanner.py"
+                ),
             }
-        
-        elif command == "kill":
+
+        if command == "kill":
             if args:
                 return {
                     "success": True,
-                    "output": f"Processus {args[0]} terminé"
+                    "output": f"Processus {args[0]} termine (simulation)",
                 }
-        
+
+        if command == "ip":
+            return {
+                "success": True,
+                "output": "Commande reseau executee (simulation)",
+            }
+
         return {
             "success": False,
-            "error": "Commande non reconnue en mode simulation"
+            "error": "Commande non reconnue en mode simulation",
+            "code": 400,
         }

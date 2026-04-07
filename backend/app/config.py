@@ -1,7 +1,10 @@
-"""Configuration de l'application"""
-from pydantic_settings import BaseSettings
+"""Configuration de l'application."""
+import json
 from functools import lru_cache
-import os
+from typing import Any, List
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -10,25 +13,28 @@ class Settings(BaseSettings):
     # Application
     app_name: str = "NetShield - Wi-Fi Security Audit Lab"
     app_version: str = "1.0.0"
-    debug: bool = os.getenv("DEBUG", "False") == "True"
+    debug: bool = Field(default=False, alias="DEBUG")
     
     # CORS
-    cors_origins: list = ["http://localhost:3000", "http://localhost:5173"]
+    cors_origins: List[str] = Field(
+        default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"],
+        alias="CORS_ORIGINS",
+    )
     
     # Backend
-    backend_host: str = "127.0.0.1"
-    backend_port: int = 8000
+    backend_host: str = Field(default="127.0.0.1", alias="BACKEND_HOST")
+    backend_port: int = Field(default=8000, alias="BACKEND_PORT")
     
     # Security - Mode simulation
-    simulation_mode: bool = True  # Toujours en mode simulation pour la sécurité
-    require_confirmation: bool = True
+    simulation_mode: bool = Field(default=True, alias="SIMULATION_MODE")
+    require_confirmation: bool = Field(default=True, alias="REQUIRE_CONFIRMATION")
     
     # Logging
-    log_level: str = "INFO"
+    log_level: str = Field(default="INFO", alias="LOG_LEVEL")
     
     # PDF Report
-    company_name: str = "NetShield Labs"
-    pdf_temp_dir: str = "./temp_reports"
+    company_name: str = Field(default="NetShield Labs", alias="COMPANY_NAME")
+    pdf_temp_dir: str = Field(default="./temp_reports", alias="PDF_TEMP_DIR")
     
     # Legal Notice
     legal_notice: str = """
@@ -48,9 +54,31 @@ class Settings(BaseSettings):
     NetShield Labs décline toute responsabilité pour les usages malveillants.
     """
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+
+    @field_validator("cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: Any) -> List[str]:
+        """Accepte JSON array ou CSV pour CORS_ORIGINS."""
+        if isinstance(value, list):
+            return value
+
+        if isinstance(value, str):
+            raw = value.strip()
+            if not raw:
+                return []
+
+            if raw.startswith("["):
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        return [str(item).strip() for item in parsed if str(item).strip()]
+                except json.JSONDecodeError:
+                    pass
+
+            return [origin.strip() for origin in raw.split(",") if origin.strip()]
+
+        return ["http://localhost:3000", "http://localhost:5173"]
 
 
 @lru_cache()

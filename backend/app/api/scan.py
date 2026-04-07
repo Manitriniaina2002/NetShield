@@ -1,9 +1,11 @@
 """Routes API pour les scans Wi-Fi"""
 from fastapi import APIRouter, Query, HTTPException
 from typing import List
+import platform
 from app.models.wifi import WiFiNetwork
 from app.models.scan import ScanResult
 from app.services.wifi_scan import WiFiScanService
+from app.config import get_settings
 from datetime import datetime
 
 router = APIRouter(prefix="/api/scan", tags=["WiFi Scan"])
@@ -25,8 +27,14 @@ async def scan_networks(
         Résultat du scan avec liste des réseaux
     """
     try:
+        settings = get_settings()
+
         # Exécuter le scan
         networks = await WiFiScanService.scan_networks(duration_seconds=duration)
+
+        system_name = platform.system().lower()
+        interface_name = "Wi-Fi" if system_name == "windows" else "wlan0"
+        scan_mode = "simulation" if settings.simulation_mode else "real"
         
         # Créer le résultat du scan
         scan_result = ScanResult(
@@ -36,8 +44,8 @@ async def scan_networks(
             networks_found=len(networks),
             networks=networks,
             scan_duration=duration,
-            interface_used="wlan0",
-            mode="simulation"
+            interface_used=interface_name,
+            mode=scan_mode,
         )
         
         return scan_result
@@ -49,7 +57,7 @@ async def scan_networks(
 @router.get("/networks/{bssid}", response_model=dict)
 async def get_network_details(
     bssid: str,
-    channel: int = Query(1, ge=1, le=14)
+    channel: int = Query(1, ge=1, le=196)
 ):
     """
     Récupère les détails d'un réseau spécifique
@@ -76,7 +84,7 @@ async def get_network_details(
 @router.post("/networks/sort")
 async def sort_networks(
     networks: List[WiFiNetwork],
-    sort_by: str = Query("signal", regex="^(signal|security|clients|channel)$")
+    sort_by: str = Query("signal", pattern="^(signal|security|clients|channel)$")
 ):
     """
     Trie les réseaux selon un critère

@@ -30,7 +30,8 @@ async def get_allowed_commands():
     """
     return {
         "commands": CommandExecutionService.ALLOWED_COMMANDS,
-        "note": "Toutes les commandes requièrent une authentification admin préalable"
+        "runtime": CommandExecutionService.get_runtime_info(),
+        "note": "Toutes les commandes requierent une authentification admin prealable",
     }
 
 
@@ -51,19 +52,14 @@ async def authenticate_admin(auth: AuthRequest):
     """
     try:
         result = await CommandExecutionService.verify_admin_auth(auth.password)
-        
+
         if result["success"]:
-            return {
-                "success": True,
-                "session_id": result["session_id"],
-                "message": result.get("message", "Authentification réussie"),
-                "expires_in": result["expires_in"],
-                "is_root": result.get("is_root", False),
-                "is_admin": result.get("is_admin", False)
-            }
-        else:
-            raise HTTPException(status_code=401, detail=result["error"])
-    
+            return result
+
+        raise HTTPException(status_code=401, detail=result["error"])
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -98,6 +94,9 @@ async def execute_command(request: CommandRequest):
         
         if result.get("require_auth"):
             raise HTTPException(status_code=401, detail=result["error"])
+
+        if result.get("code") == 403:
+            raise HTTPException(status_code=403, detail=result["error"])
         
         return result
     
@@ -110,7 +109,7 @@ async def execute_command(request: CommandRequest):
 @router.post("/execute-safe")
 async def execute_command_with_confirmation(
     command: str = Query(..., description="Commande à exécuter"),
-    args: List[str] = Query(None, description="Arguments additionnels"),
+    args: Optional[List[str]] = Query(None, description="Arguments additionnels"),
     session_id: str = Query(..., description="ID de session authentifiée"),
     confirmed: bool = Query(False, description="L'utilisateur a confirmé?")
 ):
