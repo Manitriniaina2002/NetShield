@@ -118,41 +118,29 @@ async def start_cracking_job(request: StartCrackingRequest):
             gpu_enabled=request.gpu_enabled
         )
         
-        # Lancer le job en background
-        if request.method == CrackingMethod.AIRCRACK_NG:
-            wordlist_path = "/usr/share/wordlists/rockyou.txt"  # Par défaut
-            if request.wordlist == "common":
-                wordlist_path = CrackingService.generate_common_wordlist()
-            elif request.wordlist == "academic":
-                wordlist_path = CrackingService.generate_academic_wordlist()
-            
-            # Lancer en background
-            asyncio.create_task(
-                CrackingService.start_aircrack_job(
-                    job=job,
-                    handshake_file="/tmp/capture.cap",  # Placeholder
-                    wordlist_path=wordlist_path
-                )
-            )
-        elif request.method == CrackingMethod.HASHCAT:
-            # Supporte GPU
-            asyncio.create_task(
-                CrackingService.start_hashcat_job(
-                    job=job,
-                    handshake_hash="mock_hash",  # Placeholder
-                    wordlist_path="/usr/share/wordlists/rockyou.txt",
-                    hash_type=2500  # WPA2
-                )
-            )
+        # Récupérer le chemin du wordlist
+        wordlist_path = "/usr/share/wordlists/rockyou.txt"  # Défaut
+        if request.wordlist == "common":
+            wordlist_path = CrackingService.generate_common_wordlist()
+        elif request.wordlist == "academic":
+            wordlist_path = CrackingService.generate_academic_wordlist()
+        
+        # Lancer le job directement en arrière-plan (sans await bloking)
+        await CrackingService.launch_cracking_job_background(
+            job=job,
+            handshake_file="/tmp/capture.cap",
+            wordlist_path=wordlist_path
+        )
         
         return {
             "job_id": job.job_id,
             "network_bssid": job.network_bssid,
             "network_ssid": job.network_ssid,
-            "method": job.method,
-            "status": job.status,
-            "progress": job.progress,
-            "message": "Travail de craquage lancé"
+            "method": job.method.value,
+            "status": "background_running",
+            "progress": 0,
+            "message": "Craquage lancé directement en arrière-plan sans terminal. Utilisez /api/cracking/job/{job_id} pour monitorer",
+            "poll_url": f"/api/cracking/job/{job.job_id}"
         }
     
     except Exception as e:

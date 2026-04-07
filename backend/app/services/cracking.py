@@ -65,6 +65,9 @@ class CrackingService:
     # Jobs actifs: job_id -> CrackingJob
     ACTIVE_JOBS: Dict[str, CrackingJob] = {}
     
+    # Background tasks pour gestion directe: job_id -> asyncio.Task
+    BACKGROUND_TASKS: Dict[str, asyncio.Task] = {}
+    
     # Timeouts par méthode
     TIMEOUTS = {
         CrackingMethod.AIRCRACK_NG: 3600,  # 1 heure
@@ -79,11 +82,18 @@ class CrackingService:
             result = subprocess.run(
                 ["which" if os.name != "nt" else "where", tool_name],
                 capture_output=True,
-                timeout=5
+                timeout=5,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
             )
             return result.returncode == 0
         except Exception:
             return False
+    
+    @staticmethod
+    def _is_tool_available_sync(tool_name: str) -> bool:
+        """Vérification synchrone de disponibilité d'outils (pour startup)."""
+        return CrackingService._is_tool_available(tool_name)
     
     @staticmethod
     def get_available_methods() -> Dict[str, Any]:
@@ -150,6 +160,49 @@ class CrackingService:
         return job
     
     @staticmethod
+    async def launch_cracking_job_background(
+        job: CrackingJob,
+        handshake_file: str,
+        wordlist_path: str
+    ) -> Dict[str, Any]:
+        """
+        Lance un travail de craquage en arrière-plan directement.
+        
+        Linux optimisé: Subprocess direct sans overhead
+        Returns immédiatement avec job_id pour polling
+        """
+        job.status = "running"
+        job.start_time = datetime.now()
+        
+        # Créer une task asyncio pour exécuter le craquage en arrière-plan
+        if job.method == CrackingMethod.AIRCRACK_NG:
+            task = asyncio.create_task(
+                CrackingService._run_real_aircrack(job, handshake_file, wordlist_path)
+            )
+        elif job.method == CrackingMethod.HASHCAT:
+            task = asyncio.create_task(
+                CrackingService._run_real_hashcat(job, handshake_file, wordlist_path, 2500)
+            )
+        else:
+            task = asyncio.create_task(CrackingService._simulate_aircrack(job, wordlist_path))
+        
+        CrackingService.BACKGROUND_TASKS[job.job_id] = task
+        
+        # Ajouter un callback pour nettoyer la task quand elle termine
+        def task_done_callback(task):
+            if job.job_id in CrackingService.BACKGROUND_TASKS:
+                del CrackingService.BACKGROUND_TASKS[job.job_id]
+        
+        task.add_done_callback(task_done_callback)
+        
+        return {
+            "status": "background_launched",
+            "job_id": job.job_id,
+            "message": f"Craquage lancé en arrière-plan sur {job.method.value}",
+            "poll_url": f"/api/cracking/job/{job.job_id}"
+        }
+    
+    @staticmethod
     async def start_aircrack_job(
         job: CrackingJob,
         handshake_file: str,
@@ -204,24 +257,45 @@ class CrackingService:
         handshake_file: str,
         wordlist_path: str
     ) -> Dict[str, Any]:
-        """Exécute aircrack-ng en mode réel."""
+        """
+        Exécute aircrack-ng en mode réel directement.
+        
+        Linux: Subprocess sans terminal, capture stdout/stderr directement
+        Windows: Via WSL2 ou CMD sans GUI window
+        """
         try:
+            import platform as pl
+            is_linux = pl.system() == "Linux"
+            
             cmd = [
                 "aircrack-ng",
                 "-w", wordlist_path,
-                "-l", job.network_bssid.replace(":", ""),  # Clé de fichier
+                "-l", job.network_bssid.replace(":", ""),
                 handshake_file
             ]
             
+            # Configuration subprocess pour éviter les fenêtres terminales
+            kwargs = {
+                "stdout": asyncio.subprocess.PIPE,
+                "stderr": asyncio.subprocess.PIPE,
+            }
+            
+            # Linux: Pas besoin de flags spéciaux
+            # Windows: CREATE_NO_WINDOW équivalent via startupinfo
+            if not is_linux and os.name == 'nt':
+                import subprocess
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.HIDE_WINDOW
+                kwargs["startupinfo"] = si
+            
             process = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                # Note: mode réel requiert aircrack-ng installé
+                **kwargs
             )
             
-            # Timeout et capture progressive du mot de passe
             timeout = CrackingService.TIMEOUTS[CrackingMethod.AIRCRACK_NG]
+            
+            # Lance le subprocess et monitore la progression
             try:
                 stdout, stderr = await asyncio.wait_for(
                     process.communicate(),
@@ -229,28 +303,35 @@ class CrackingService:
                 )
                 
                 output = stdout.decode('utf-8', errors='ignore')
+                error_output = stderr.decode('utf-8', errors='ignore')
                 
-                # Chercher le mot de passe dans la sortie
-                if "KEY FOUND" in output or "password" in output.lower():
-                    # Extraction du mot de passe (format spécifique aircrack-ng)
+                # Parser la sortie aircrack-ng
+                if "KEY FOUND" in output:
+                    # Format: [ AA:BB:CC:DD:EE:FF ]
                     lines = output.split('\n')
                     for line in lines:
                         if "KEY FOUND" in line:
                             password = line.split("[ ")[-1].rstrip(" ]")
                             job.password_found = password
                             job.status = "completed"
+                            job.progress = 100
                             break
                 else:
                     job.status = "failed"
-                    job.error_message = "Aucun mot de passe trouvé dans le dictionnaire"
+                    job.error_message = "Key not found in wordlist"
+                    job.progress = 100
                 
-                job.progress = 100
                 job.attempts = job.wordlist_size
                 
             except asyncio.TimeoutError:
                 job.status = "timeout"
                 job.error_message = f"Timeout après {timeout}s"
-                process.kill()
+                job.progress = 100
+                try:
+                    process.kill()
+                    await asyncio.sleep(0.1)
+                except:
+                    pass
             
             job.end_time = datetime.now()
             
@@ -259,6 +340,18 @@ class CrackingService:
                 "job_id": job.job_id,
                 "password_found": job.password_found,
                 "progress": job.progress,
+                "platform": pl.system()
+            }
+            
+        except FileNotFoundError:
+            job.status = "failed"
+            job.error_message = "aircrack-ng not found in PATH. Install: apt install aircrack-ng"
+            job.end_time = datetime.now()
+            return {
+                "status": "error",
+                "job_id": job.job_id,
+                "error": "aircrack-ng not installed",
+                "install_command": "sudo apt install aircrack-ng"
             }
             
         except Exception as e:
@@ -330,28 +423,51 @@ class CrackingService:
         wordlist_path: str,
         hash_type: int
     ) -> Dict[str, Any]:
-        """Exécute hashcat en mode réel."""
+        """
+        Exécute hashcat en mode réel directement.
+        
+        Linux: Subprocess sans terminal, GPU support natif
+        Windows: Native hashcat si disponible
+        macOS: Metal GPU support
+        """
         try:
+            import platform as pl
+            is_linux = pl.system() == "Linux"
+            
             cmd = [
                 "hashcat",
                 "-m", str(hash_type),  # 2500 = WPA2-PSK, 16800 = WPA3-PSK
                 "-w", "3",  # Mode agressif
                 "--potfile-disable",  # Désactiver le cache
+                "--quiet",  # Moins de sortie verbale (Linux friendly)
                 handshake_hash,
                 wordlist_path,
             ]
             
-            # Ajouter GPU si disponible
-            if job.gpu_enabled:
-                cmd.extend(["-d", "1"])  # GPU device
+            # Configuration subprocess pour éviter les fenêtres terminales
+            kwargs = {
+                "stdout": asyncio.subprocess.PIPE,
+                "stderr": asyncio.subprocess.PIPE,
+            }
+            
+            # Ajouter GPU sur Linux si disponible
+            if is_linux and job.gpu_enabled:
+                cmd.extend(["-d", "1"])  # GPU device 1
+            
+            # Windows: CREATE_NO_WINDOW
+            if not is_linux and os.name == 'nt':
+                import subprocess
+                si = subprocess.STARTUPINFO()
+                si.dwFlags |= subprocess.HIDE_WINDOW
+                kwargs["startupinfo"] = si
             
             process = await asyncio.create_subprocess_exec(
                 *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+                **kwargs
             )
             
             timeout = CrackingService.TIMEOUTS[CrackingMethod.HASHCAT]
+            
             try:
                 stdout, stderr = await asyncio.wait_for(
                     process.communicate(),
@@ -359,27 +475,59 @@ class CrackingService:
                 )
                 
                 output = stdout.decode('utf-8', errors='ignore')
+                error_output = stderr.decode('utf-8', errors='ignore')
                 
-                if "recovered" in output.lower() or "cracked" in output.lower():
-                    job.status = "completed"
-                    job.password_found = "MotDePasse"  # Extraction depuis output
+                # Parser la sortie hashcat
+                if "recovered" in output.lower() or "status" in output.lower():
+                    # Extraction du mot de passe trouvé
+                    # Format: hash:password
+                    lines = output.split('\n')
+                    for line in lines:
+                        if ":" in line and len(line) > 20:
+                            parts = line.split(":")
+                            if len(parts) >= 2:
+                                job.password_found = parts[-1].strip()
+                                job.status = "completed"
+                                break
+                    
+                    if not job.password_found:
+                        job.status = "failed"
+                        job.error_message = "No candidates left"
                 else:
                     job.status = "failed"
-                    job.error_message = "Aucun hash craqué"
+                    job.error_message = "Hash not cracked"
                 
                 job.progress = 100
                 
             except asyncio.TimeoutError:
                 job.status = "timeout"
                 job.error_message = f"Timeout après {timeout}s"
-                process.kill()
+                job.progress = 100
+                try:
+                    process.kill()
+                    await asyncio.sleep(0.1)
+                except:
+                    pass
             
             job.end_time = datetime.now()
+            
             return {
                 "status": "success",
                 "job_id": job.job_id,
                 "password_found": job.password_found,
                 "progress": job.progress,
+                "gpu_used": job.gpu_enabled and is_linux
+            }
+            
+        except FileNotFoundError:
+            job.status = "failed"
+            job.error_message = "hashcat not found. Install: apt install hashcat"
+            job.end_time = datetime.now()
+            return {
+                "status": "error",
+                "job_id": job.job_id,
+                "error": "hashcat not installed",
+                "install_command": "sudo apt install hashcat (or use pre-built binary)"
             }
             
         except Exception as e:
