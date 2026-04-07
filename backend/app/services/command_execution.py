@@ -15,10 +15,20 @@ class CommandExecutionService:
 
     # Commandes logiques exposees a l'UI/API.
     ALLOWED_COMMANDS = {
+        # Commandes réseau
         "ifconfig": "Afficher les interfaces reseau",
         "ip": "Commandes reseau avancees",
+        
+        # Commandes Wi-Fi scanning (Linux)
         "airmon-ng": "Activer/desactiver le mode monitor (Linux)",
         "airodump-ng": "Scanner les reseaux Wi-Fi (Linux)",
+        
+        # Commandes de craquage (requires powerful hardware)
+        "aircrack-ng": "Craquage WEP/WPA/WPA2 (Linux/macOS)",
+        "hashcat": "GPU-accelerated password cracking",
+        "john": "John the Ripper - craquage de mots de passe",
+        
+        # Commandes système
         "ps": "Lister les processus",
         "kill": "Terminer un processus",
     }
@@ -55,13 +65,19 @@ class CommandExecutionService:
     def get_runtime_info() -> Dict[str, Any]:
         """Expose les infos de compatibilite de la plateforme courante."""
         current_platform = CommandExecutionService._platform_name()
-        linux_only = ["airmon-ng", "airodump-ng"]
+        linux_only = ["airmon-ng", "airodump-ng", "aircrack-ng", "john"]
+        gpu_accelerated = ["hashcat"]
 
         return {
             "platform": current_platform,
             "is_admin_context": CommandExecutionService._is_admin_context(),
             "simulation_mode": get_settings().simulation_mode,
             "linux_only_commands": linux_only if current_platform == "windows" else [],
+            "gpu_accelerated_commands": gpu_accelerated,
+            "recommended_tools": {
+                "cracking": "hashcat (GPU)" if current_platform != "windows" else "aircrack-ng (CPU via WSL2)",
+                "handshake_capture": "airodump-ng (Linux/WSL2) / Wireshark (all platforms)"
+            }
         }
 
     @staticmethod
