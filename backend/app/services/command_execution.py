@@ -62,6 +62,38 @@ class CommandExecutionService:
         return (time.time() - created_at) > CommandExecutionService.SESSION_LIFETIME
 
     @staticmethod
+    async def _verify_linux_sudo_password(password: str) -> Tuple[bool, str]:
+        """Valide un mot de passe sudo via une vraie demande d'elevation."""
+        if not password:
+            return False, "Mot de passe root/admin requis en mode reel"
+
+        try:
+            process = await asyncio.create_subprocess_exec(
+                "sudo",
+                "-S",
+                "-k",
+                "-p",
+                "",
+                "-v",
+                stdin=asyncio.subprocess.PIPE,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            _, stderr = await process.communicate(input=f"{password}\n".encode("utf-8"))
+
+            if process.returncode != 0:
+                error_text = stderr.decode("utf-8", errors="ignore").strip()
+                if not error_text:
+                    error_text = "Authentification root/admin invalide"
+                return False, error_text
+
+            return True, ""
+        except FileNotFoundError:
+            return False, "Commande 'sudo' introuvable sur ce systeme"
+        except Exception as exc:
+            return False, f"Erreur verification sudo: {str(exc)}"
+
+    @staticmethod
     def get_runtime_info() -> Dict[str, Any]:
         """Expose les infos de compatibilite de la plateforme courante."""
         current_platform = CommandExecutionService._platform_name()
@@ -113,8 +145,37 @@ class CommandExecutionService:
                 "mode": "simulation",
             }
 
+        current_platform = CommandExecutionService._platform_name()
+
         if not CommandExecutionService._is_admin_context():
-            current_platform = CommandExecutionService._platform_name()
+            if current_platform == "linux":
+                valid, error = await CommandExecutionService._verify_linux_sudo_password(password)
+                if not valid:
+                    return {
+                        "success": False,
+                        "error": error,
+                        "mode": "real",
+                        "platform": current_platform,
+                    }
+
+                session_id = str(uuid.uuid4())
+                CommandExecutionService.AUTHENTICATED_SESSIONS[session_id] = {
+                    "created_at": time.time(),
+                    "platform": current_platform,
+                    "mode": "real",
+                    "sudo_authenticated": True,
+                    # Conservé en memoire uniquement pour re-soumettre sudo -S a chaque commande.
+                    "sudo_password": password,
+                }
+
+                return {
+                    "success": True,
+                    "session_id": session_id,
+                    "message": "Authentification root reussie via sudo",
+                    "expires_in": CommandExecutionService.SESSION_LIFETIME,
+                    "mode": "real",
+                }
+
             if current_platform == "windows":
                 reason = "Demarrez le backend avec 'Executer en tant qu'administrateur'."
             else:
@@ -130,7 +191,7 @@ class CommandExecutionService:
         session_id = str(uuid.uuid4())
         CommandExecutionService.AUTHENTICATED_SESSIONS[session_id] = {
             "created_at": time.time(),
-            "platform": CommandExecutionService._platform_name(),
+            "platform": current_platform,
             "mode": "real",
         }
 
@@ -235,14 +296,32 @@ class CommandExecutionService:
             executable, normalized_args = CommandExecutionService._resolve_command(command, args)
             cmd_list = [executable] + normalized_args
 
+            session = CommandExecutionService.AUTHENTICATED_SESSIONS.get(session_id or "", {})
+            needs_sudo = (
+                not CommandExecutionService._is_admin_context()
+                and CommandExecutionService._platform_name() == "linux"
+                and bool(session.get("sudo_authenticated"))
+            )
+
+            process_stdin = None
+            process_input = None
+
+            if needs_sudo:
+                cmd_list = ["sudo", "-S", "-p", ""] + cmd_list
+                process_stdin = asyncio.subprocess.PIPE
+                process_input = f"{session.get('sudo_password', '')}\n".encode("utf-8")
+
             process = await asyncio.create_subprocess_exec(
                 *cmd_list,
+                stdin=process_stdin,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
 
             try:
-                stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(input=process_input), timeout=timeout
+                )
             except asyncio.TimeoutError:
                 process.kill()
                 await process.communicate()
