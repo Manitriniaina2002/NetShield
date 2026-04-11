@@ -2,6 +2,18 @@ import React, { useState, useEffect } from 'react'
 import { wifiAPI } from '../api'
 
 function CrackingPanel({ selectedNetwork, vulnerabilities }) {
+  const normalizeMethodId = (methodId) => {
+    const aliases = {
+      aircrack_ng: 'aircrack-ng',
+      'aircrack-ng': 'aircrack-ng',
+      hashcat: 'hashcat',
+      john_ripper: 'john',
+      john: 'john'
+    }
+
+    return aliases[methodId] || methodId
+  }
+
   const [crackingJobs, setCrackingJobs] = useState([])
   const [selectedMethod, setSelectedMethod] = useState('aircrack-ng')
   const [selectedWordlist, setSelectedWordlist] = useState('academic')
@@ -47,12 +59,22 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
       ])
       
       setCrackingStatus(statusRes.data)
-      setMethods(Object.entries(statusRes.data.available_tools || {}).map(([key, val]) => ({
-        id: key,
+      const methodsSource = Object.keys(methodRes.data || {}).length > 0
+        ? methodRes.data
+        : (statusRes.data.available_tools || {})
+
+      const normalizedMethods = Object.entries(methodsSource).map(([key, val]) => ({
+        id: normalizeMethodId(key),
         name: val.name || key,
         description: val.description,
-        available: val.available
-      })))
+        available: Boolean(val.available ?? val.is_available)
+      }))
+
+      setMethods(normalizedMethods)
+      if (!normalizedMethods.some(m => m.id === selectedMethod)) {
+        const firstAvailable = normalizedMethods.find(m => m.available)
+        setSelectedMethod(firstAvailable?.id || 'aircrack-ng')
+      }
       
       setWordlists(Object.entries(wordlistRes.data || {}).map(([key, val]) => ({
         id: key,
@@ -83,7 +105,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
     try {
       const response = await wifiAPI.startCrackingJob(
         selectedNetwork.bssid,
-        selectedMethod,
+        normalizeMethodId(selectedMethod),
         selectedWordlist,
         gpuEnabled
       )

@@ -18,6 +18,18 @@ api.interceptors.response.use(
   }
 )
 
+const normalizeCrackingMethod = (method) => {
+  const aliases = {
+    aircrack_ng: 'aircrack-ng',
+    'aircrack-ng': 'aircrack-ng',
+    hashcat: 'hashcat',
+    john_ripper: 'john',
+    john: 'john'
+  }
+
+  return aliases[method] || method
+}
+
 export const wifiAPI = {
   // Scan Wi-Fi
   scanNetworks: (duration = 10, name = 'Audit Scan') =>
@@ -74,7 +86,7 @@ export const wifiAPI = {
   startCrackingJob: (networkBssid, method = 'aircrack-ng', wordlist = 'academic', gpuEnabled = false) =>
     api.post('/cracking/start', {
       network_bssid: networkBssid,
-      method,
+      method: normalizeCrackingMethod(method),
       wordlist,
       gpu_enabled: gpuEnabled
     }),

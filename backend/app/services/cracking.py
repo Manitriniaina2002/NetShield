@@ -81,10 +81,10 @@ class CrackingService:
         try:
             result = subprocess.run(
                 ["which" if os.name != "nt" else "where", tool_name],
-                capture_output=True,
-                timeout=5,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+                check=False,
             )
             return result.returncode == 0
         except Exception:

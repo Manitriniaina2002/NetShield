@@ -71,6 +71,29 @@ Le backend sera accessible à : **http://localhost:8000**
 - API Docs (Swagger) : http://localhost:8000/api/docs
 - ReDoc : http://localhost:8000/api/redoc
 
+### 2️⃣ bis Démarrage du Backend en Mode Réel (Linux)
+
+Le mode réel désactive la simulation et exécute les commandes système autorisées.
+
+```bash
+# Depuis la racine du projet
+cd backend
+
+# Option 1 (recommandée): forcer le mode réel au runtime
+SIMULATION_MODE=False /home/kali/Desktop/NetShield/.venv/bin/python main.py
+
+# Option 2: via fichier .env (dans backend/.env)
+# SIMULATION_MODE=False
+# /home/kali/Desktop/NetShield/.venv/bin/python main.py
+```
+
+Validation rapide:
+
+```bash
+curl http://127.0.0.1:8000/health
+# Attendu: "simulation_mode": false
+```
+
 ### 3️⃣ Installation du Frontend
 
 ```bash
@@ -89,6 +112,20 @@ npm run dev
 
 # L'application sera accessible à : http://localhost:3000
 ```
+
+Pour exécuter l'application complète avec backend en mode réel:
+
+```bash
+# Terminal 1 (backend réel)
+cd backend
+SIMULATION_MODE=False /home/kali/Desktop/NetShield/.venv/bin/python main.py
+
+# Terminal 2 (frontend)
+cd frontend
+npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+Interface web: http://127.0.0.1:5173
 
 ---
 
@@ -273,9 +310,16 @@ Par défaut, l'application s'exécute en **mode simulation sécurisé**:
 - ✅ Idéal pour l'apprentissage et les tests
 
 Pour activer le mode réel (Linux uniquement):
-1. Modifier `SIMULATION_MODE=False` dans `.env`
-2. S'assurer que `airmon-ng` et `airodump-ng` sont installés
-3. Exécuter avec privilèges root
+1. Lancer le backend avec `SIMULATION_MODE=False` (ou définir la valeur dans `backend/.env`)
+2. Vérifier les outils requis (`aircrack-ng`, `airodump-ng`, `hashcat`, etc.)
+3. Exécuter uniquement sur un environnement autorisé de laboratoire
+
+Exemple:
+
+```bash
+cd backend
+SIMULATION_MODE=False /home/kali/Desktop/NetShield/.venv/bin/python main.py
+```
 
 ---
 
@@ -410,4 +454,4 @@ Pour les questions ou problèmes :
 
 **Développé avec ❤️ pour la cybersécurité défensive**
 
-*Dernière mise à jour : 2024*
+*Dernière mise à jour : 2026*
