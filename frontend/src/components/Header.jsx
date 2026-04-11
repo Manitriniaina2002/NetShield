@@ -1,94 +1,85 @@
 import React, { useState } from 'react'
+import { Button } from './ui/button'
+import { Badge } from './ui/badge'
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 
 export function Header() {
-  const [darkMode, setDarkMode] = useState(true)
   const [showLegal, setShowLegal] = useState(false)
+  const logoSrc = '/logo-netshield.png'
 
   return (
     <>
-      <header className="bg-gradient-to-r from-[#0a0e27] via-[#151a3a] to-[#0f1423] shadow-lg border-b border-[#2a2f4a]">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-[#33cc00] to-[#28a300] rounded-lg flex items-center justify-center text-[#0a0e27] font-bold font-mono text-lg shadow-lg shadow-[#33cc00]/50">
-              NS
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-[#33cc00] font-mono">NetShield</h1>
-              <p className="text-[#9ca3af] text-sm font-mono">Wi-Fi Security Audit Lab</p>
+      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+          <div className="flex items-center">
+            <div className="h-14 w-14 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm sm:h-16 sm:w-16">
+              <img
+                src={logoSrc}
+                alt="NetShield logo"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                  const fallback = e.currentTarget.nextElementSibling
+                  if (fallback) fallback.style.display = 'flex'
+                }}
+              />
+              <div className="hidden h-full w-full items-center justify-center bg-gradient-to-br from-emerald-500 to-teal-500 text-sm font-semibold text-white">
+                NS
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            {/* Bouton Info Légale */}
-            <button
-              onClick={() => setShowLegal(!showLegal)}
-              className="px-4 py-2 bg-[#1a1f3a] hover:bg-[#1e2449] text-[#e5e7eb] rounded-lg text-sm transition-all border border-[#2a2f4a] hover:border-[#33cc00] font-mono font-semibold"
-            >
-              ⚠ Mentions Légales
-            </button>
-
-            {/* Toggle Dark Mode */}
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              className="px-4 py-2 bg-[#1a1f3a] hover:bg-[#1e2449] text-[#e5e7eb] rounded-lg transition-all border border-[#2a2f4a] hover:border-[#33cc00] font-mono font-semibold"
-            >
-              {darkMode ? '☼' : '◯'}
-            </button>
-          </div>
+          <Button variant="outline" onClick={() => setShowLegal(true)}>
+            Mentions légales
+          </Button>
         </div>
       </header>
 
-      {/* Modal Mentions Légales */}
       {showLegal && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-gradient-to-br from-[#1a1f3a] to-[#151a3a] rounded-lg max-w-2xl max-h-96 overflow-y-auto border border-[#ef4444] border-2 p-6 shadow-2xl shadow-[#ef4444]/20">
-            <div className="flex justify-between items-start mb-4">
-              <h2 className="text-2xl font-bold text-[#ef4444] font-mono">⚠ AVERTISSEMENT LÉGAL ET ÉTHIQUE</h2>
-              <button
-                onClick={() => setShowLegal(false)}
-                className="text-2xl text-[#9ca3af] hover:text-[#33cc00] transition-colors"
-              >
-                ✕
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-2xl animate-fade-up overflow-hidden shadow-2xl">
+            <CardHeader className="border-b border-slate-200 bg-slate-50/80">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <Badge variant="destructive" className="mb-3">Avis important</Badge>
+                  <CardTitle>Utilisation autorisée uniquement dans un cadre défensif</CardTitle>
+                </div>
+                <Button variant="ghost" size="icon" onClick={() => setShowLegal(false)} aria-label="Fermer">
+                  ✕
+                </Button>
+              </div>
+            </CardHeader>
 
-            <div className="text-[#e5e7eb] space-y-4 text-sm font-mono">
-              <div>
-                <h3 className="text-lg font-semibold text-[#33cc00] mb-2 uppercase tracking-wider">• Utilisation Autorisée</h3>
-                <p className="text-[#9ca3af]">
-                  Cet outil est destiné UNIQUEMENT à :
-                </p>
-                <ul className="list-disc list-inside mt-2 text-[#9ca3af] space-y-1">
-                  <li>Des fins ÉDUCATIVES</li>
-                  <li>Des tests de sécurité AUTORISÉS (pentest avec consentement écrit)</li>
-                  <li>Un environnement CONTRÔLÉ (laboratoire, sandboxe)</li>
-                </ul>
+            <CardContent className="space-y-6 p-6 text-sm text-slate-600">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                  <h3 className="mb-2 text-sm font-semibold text-emerald-700">Utilisation autorisée</h3>
+                  <ul className="list-disc space-y-1 pl-5">
+                    <li>Fins éducatives</li>
+                    <li>Tests autorisés avec consentement écrit</li>
+                    <li>Environnement contrôlé de laboratoire</li>
+                  </ul>
+                </div>
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+                  <h3 className="mb-2 text-sm font-semibold text-rose-700">Utilisation interdite</h3>
+                  <ul className="list-disc space-y-1 pl-5">
+                    <li>Accès non autorisé à des réseaux tiers</li>
+                    <li>Tests sans consentement explicite</li>
+                    <li>Activités contraires aux lois locales</li>
+                  </ul>
+                </div>
               </div>
 
-              <div>
-                <h3 className="text-lg font-semibold text-[#ef4444] mb-2 uppercase tracking-wider">✕ Utilisation Interdite</h3>
-                <ul className="list-disc list-inside text-[#fca5a5] space-y-1">
-                  <li>Tout accès NON AUTORISÉ à des réseaux Wi-Fi</li>
-                  <li>Tests sur des réseaux tiers SANS CONSENTEMENT</li>
-                  <li>Toute activité violant les lois locales/nationales</li>
-                </ul>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-amber-800">
+                L'utilisateur assume l'entière responsabilité légale de l'utilisation de cet outil. NetShield Labs décline toute responsabilité pour les usages malveillants.
               </div>
 
-              <div className="bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-lg p-4 mt-4">
-                <p className="text-[#fca5a5] font-semibold">
-                  L'utilisateur assume l'entière responsabilité légale de l'utilisation de cet outil.
-                  NetShield Labs décline toute responsabilité pour les usages malveillants.
-                </p>
+              <div className="flex justify-end gap-3">
+                <Button variant="secondary" onClick={() => setShowLegal(false)}>Fermer</Button>
+                <Button onClick={() => setShowLegal(false)}>J'ai compris</Button>
               </div>
-            </div>
-
-            <button
-              onClick={() => setShowLegal(false)}
-              className="mt-6 w-full px-4 py-2 bg-gradient-to-r from-[#33cc00] to-[#28a300] text-[#0a0e27] rounded-lg transition-all font-mono font-bold hover:from-[#4dff00] hover:to-[#33cc00] shadow-lg"
-            >
-              ✓ J'ai compris
-            </button>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </>

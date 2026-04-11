@@ -596,7 +596,8 @@ class CrackingService:
             "654321", "superman", "qazwsx", "michael", "football",
             "wifi123", "wifipass", "networkpass", "secure123", "admin123",
             "password123", "Password123", "Password@123", "SecurePass123",
-            "Welcome123", "Guest123", "User123", "Test123", "Demo123"
+            "Welcome123", "Guest123", "User123", "Test123", "Demo123",
+            "Adesolaire2025"
         ]
         
         with tempfile.NamedTemporaryFile(

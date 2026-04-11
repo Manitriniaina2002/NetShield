@@ -5,6 +5,7 @@ import VulnerabilityPanel from './VulnerabilityPanel'
 import RecommendationPanel from './RecommendationPanel'
 import CommandPanel from './CommandPanel'
 import CrackingPanel from './CrackingPanel'
+import Header from './Header'
 import { NavBar } from './NavBar'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -22,7 +23,6 @@ export function Dashboard() {
   const [reportMode, setReportMode] = useState(false)
   const [toast, setToast] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
-  const logoSrc = '/logo-netshield.png'
 
   // Effectuer un scan réel au démarrage
   useEffect(() => {
@@ -166,7 +166,7 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen">
-      <NavBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <Header />
 
       {toast && (
         <div className="fixed right-4 top-4 z-50 animate-fade-up">
@@ -185,12 +185,12 @@ export function Dashboard() {
         <Card className="mb-8 overflow-hidden border-slate-200 bg-white/90">
           <div className="grid gap-6 border-b border-slate-200 p-6 lg:grid-cols-[1.5fr_1fr] lg:p-8">
             <div className="space-y-4">
-              <div className="h-24 w-24 overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-sm sm:h-28 sm:w-28">
-                <img
-                  src={logoSrc}
-                  alt="NetShield logo"
-                  className="h-full w-full object-cover"
-                />
+              <Badge variant="info" className="w-fit">Audit Wi-Fi en direct</Badge>
+              <div>
+                <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Tableau de bord de sécurité</h2>
+                <p className="mt-2 max-w-2xl text-sm text-slate-600">
+                  Analyse les réseaux, visualise les vulnérabilités et pilote les actions de remédiation depuis une interface claire et moderne.
+                </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
@@ -206,32 +206,28 @@ export function Dashboard() {
             <div className="grid gap-3 sm:grid-cols-2">
               <Card className="border-slate-200 bg-slate-50">
                 <CardHeader className="pb-2">
-                  <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">NW</div>
-                  <CardDescription className="text-slate-600">Réseaux détectés</CardDescription>
+                  <CardDescription>Réseaux détectés</CardDescription>
                   <CardTitle className="text-3xl text-slate-900">{networks.length}</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0"><Progress value={(networks.length / 20) * 100} /></CardContent>
               </Card>
               <Card className="border-slate-200 bg-slate-50">
                 <CardHeader className="pb-2">
-                  <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700">VL</div>
-                  <CardDescription className="text-slate-600">Vulnérabilités</CardDescription>
+                  <CardDescription>Vulnérabilités</CardDescription>
                   <CardTitle className="text-3xl text-slate-900">{vulnerabilities.length}</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0"><Progress value={(vulnerabilities.length / 50) * 100} /></CardContent>
               </Card>
               <Card className="border-slate-200 bg-slate-50">
                 <CardHeader className="pb-2">
-                  <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">RC</div>
-                  <CardDescription className="text-slate-600">Recommandations</CardDescription>
+                  <CardDescription>Recommandations</CardDescription>
                   <CardTitle className="text-3xl text-slate-900">{recommendations.length}</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-0"><Progress value={(recommendations.length / 30) * 100} /></CardContent>
               </Card>
               <Card className="border-slate-200 bg-slate-50">
                 <CardHeader className="pb-2">
-                  <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">RS</div>
-                  <CardDescription className="text-slate-600">Score de risque</CardDescription>
+                  <CardDescription>Score de risque</CardDescription>
                   <CardTitle className={`text-3xl ${getRiskScore() > 70 ? 'text-rose-600' : 'text-amber-600'}`}>
                     {getRiskScore().toFixed(0)}<span className="text-base text-slate-500">/100</span>
                   </CardTitle>
@@ -242,7 +238,30 @@ export function Dashboard() {
           </div>
         </Card>
 
-        <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6 overflow-x-auto rounded-2xl border border-slate-200 bg-white/80 p-1 shadow-sm backdrop-blur-sm">
+          <div className="flex min-w-max gap-1">
+            {['overview', 'vulnerabilities', 'recommendations', 'cracking', 'commands', 'report'].map(tab => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`rounded-xl px-5 py-3 text-sm font-medium transition ${
+                  activeTab === tab
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                {tab === 'overview' && 'Vue d’ensemble'}
+                {tab === 'vulnerabilities' && 'Vulnérabilités'}
+                {tab === 'recommendations' && 'Recommandations'}
+                {tab === 'cracking' && 'Craquage'}
+                {tab === 'commands' && 'Commandes'}
+                {tab === 'report' && 'Rapport'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-6">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <>
@@ -279,7 +298,7 @@ export function Dashboard() {
 
           {/* Commands Tab */}
           {activeTab === 'commands' && (
-            <CommandPanel networks={networks} />
+            <CommandPanel />
           )}
 
           {/* Report Tab */}

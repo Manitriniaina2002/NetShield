@@ -1,11 +1,54 @@
 import React, { useState, useEffect } from 'react'
 import AdminAuthModal from './AdminAuthModal'
+import { Button } from './ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
+import { Badge } from './ui/badge'
+import { Input } from './ui/input'
+
+const COMMAND_ARGUMENT_HINTS = {
+  ifconfig: {
+    description: 'Afficher les interfaces et adresses réseau.',
+    templates: ['-a']
+  },
+  ip: {
+    description: 'Commandes réseau Linux modernes.',
+    templates: ['addr show', 'link show', 'route']
+  },
+  'airmon-ng': {
+    description: 'Activer/Désactiver le mode monitor.',
+    templates: ['start wlan0', 'stop wlan0mon']
+  },
+  'airodump-ng': {
+    description: 'Scanner ou cibler un réseau Wi-Fi.',
+    templates: ['wlan0mon', '--bssid <BSSID> -c <CHANNEL> wlan0mon', '-w capture wlan0mon']
+  },
+  'aircrack-ng': {
+    description: 'Lancer un test de craquage sur capture.',
+    templates: ['-w /usr/share/wordlists/rockyou.txt capture.cap', '-b <BSSID> -w /usr/share/wordlists/rockyou.txt capture.cap']
+  },
+  hashcat: {
+    description: 'Craquage accéléré GPU (si disponible).',
+    templates: ['-m 22000 handshake.hc22000 /usr/share/wordlists/rockyou.txt']
+  },
+  john: {
+    description: 'Test de dictionnaire avec John the Ripper.',
+    templates: ['--wordlist=/usr/share/wordlists/rockyou.txt hashes.txt']
+  },
+  ps: {
+    description: 'Lister les processus actifs.',
+    templates: ['aux', '-ef']
+  },
+  kill: {
+    description: 'Terminer un processus par PID.',
+    templates: ['-9 <PID>']
+  }
+}
 
 /**
  * Composant de panneau d'exécution de commandes système
  * Interface sécurisée avec authentification admin requise
  */
-export function CommandPanel() {
+export function CommandPanel({ networks = [] }) {
   const [commands, setCommands] = useState([])
   const [selectedCommand, setSelectedCommand] = useState(null)
   const [commandArgs, setCommandArgs] = useState('')
@@ -113,182 +156,189 @@ export function CommandPanel() {
     setError(null)
   }
 
+  const insertArgument = (value) => {
+    setCommandArgs((prev) => (prev ? `${prev} ${value}` : value))
+  }
+
+  const commandHelp = selectedCommand ? COMMAND_ARGUMENT_HINTS[selectedCommand] : null
+  const networkSuggestions = networks
+    .filter((net) => net && net.bssid)
+    .slice(0, 8)
+
   return (
     <div className="space-y-6">
-      
-      {/* Header */}
-      <div className="card">
-        <div className="flex items-center justify-between">
+      <Card>
+        <CardHeader className="flex flex-col gap-4 border-b border-slate-200 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-[#33cc00] font-mono uppercase tracking-wider flex items-center gap-2">
-              ⚙ Panneau de Commandes Système
-            </h2>
-            <p className="text-[#9ca3af] mt-1 font-mono">
-              Exécution sécurisée de commandes système (avec authentification admin)
-            </p>
+            <CardTitle>Panneau de commandes système</CardTitle>
+            <CardDescription>Exécution sécurisée avec authentification administrateur.</CardDescription>
           </div>
-          
-          {isAuthenticated && (
-            <div className="bg-[#10b981]/20 border border-[#10b981]/40 text-[#34d399] px-4 py-2 rounded-lg">
-              <div className="text-sm font-semibold font-mono">✓ Authentifié</div>
-              <div className="text-xs mt-1 font-mono">Session active (1 heure)</div>
+          {isAuthenticated ? <Badge variant="success">Session active</Badge> : <Badge variant="warning">Non authentifié</Badge>}
+        </CardHeader>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Sélectionnez une commande</CardTitle>
+            <CardDescription>Les commandes sont filtrées côté backend par une whitelist.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+              {commands.map((cmd) => (
+                <button
+                  key={cmd.name}
+                  onClick={() => setSelectedCommand(cmd.name)}
+                  className={`w-full rounded-2xl border p-4 text-left transition ${
+                    selectedCommand === cmd.name
+                      ? 'border-emerald-300 bg-emerald-50 shadow-sm'
+                      : 'border-slate-200 bg-white hover:border-emerald-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="font-mono text-sm font-semibold text-slate-900">{cmd.name}</div>
+                  <div className="mt-1 text-sm text-slate-500">{cmd.description}</div>
+                </button>
+              ))}
             </div>
-          )}
-        </div>
-      </div>
 
-      {/* Zone des commandes */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Sélecteur de commande */}
-        <div className="lg:col-span-2 card">
-          <h3 className="text-lg font-bold text-[#33cc00] mb-4 font-mono uppercase tracking-wider">
-            ⚙ Sélectionnez une Commande
-          </h3>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-700">Arguments (optionnel)</label>
+              <Input
+                type="text"
+                value={commandArgs}
+                onChange={(e) => setCommandArgs(e.target.value)}
+                placeholder="ex: wlan0 start"
+                disabled={!selectedCommand || loading}
+              />
+            </div>
 
-          {/* Liste des commandes */}
-          <div className="space-y-2 mb-4 max-h-64 overflow-y-auto">
-            {commands.map((cmd) => (
-              <button
-                key={cmd.name}
-                onClick={() => setSelectedCommand(cmd.name)}
-                className={`w-full text-left px-4 py-3 rounded-lg border-2 transition font-mono
-                  ${selectedCommand === cmd.name
-                    ? 'border-[#33cc00] bg-[#33cc00]/10'
-                    : 'border-[#2a2f4a] hover:border-[#33cc00]/50'
-                  }
-                `}
-              >
-                <div className={`font-bold ${selectedCommand === cmd.name ? 'text-[#33cc00]' : 'text-[#e5e7eb]'}`}>
-                  {cmd.name}
+            {selectedCommand && (
+              <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Arguments suggérés</p>
+                  <p className="text-xs text-slate-500">
+                    {commandHelp?.description || 'Utilisez les exemples ci-dessous pour remplir rapidement les arguments.'}
+                  </p>
                 </div>
-                <div className="text-sm text-[#9ca3af]">
-                  {cmd.description}
+
+                <div className="flex flex-wrap gap-2">
+                  {(commandHelp?.templates || []).map((template) => (
+                    <button
+                      key={template}
+                      type="button"
+                      onClick={() => insertArgument(template)}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+                      disabled={loading}
+                    >
+                      {template}
+                    </button>
+                  ))}
                 </div>
-              </button>
-            ))}
-          </div>
 
-          {/* Champ arguments */}
-          <div>
-            <label className="block text-sm font-bold text-[#33cc00] mb-2 font-mono uppercase">
-              ✑ Arguments (optionnel)
-            </label>
-            <input
-              type="text"
-              value={commandArgs}
-              onChange={(e) => setCommandArgs(e.target.value)}
-              placeholder="ex: wlan0 start"
-              disabled={!selectedCommand || loading}
-              className="w-full px-4 py-2 border border-[#2a2f4a] rounded-lg
-                bg-[#151a3a] text-[#e5e7eb] font-mono
-                focus:ring-2 focus:ring-[#33cc00] focus:border-[#33cc00] focus:outline-none
-                disabled:opacity-50 disabled:cursor-not-allowed"
-            />
-          </div>
-
-          {/* Boutons d'action */}
-          <div className="flex gap-3 mt-4">
-            <button
-              onClick={handleExecuteClick}
-              disabled={!selectedCommand || loading}
-              className="flex-1 px-4 py-2 bg-gradient-to-r from-[#33cc00] to-[#28a300] text-[#0a0e27] rounded-lg transition
-                disabled:opacity-50 disabled:cursor-not-allowed font-bold flex items-center justify-center gap-2 font-mono"
-            >
-              {loading ? (
-                <>
-                  <span className="animate-spin">◌</span>
-                  Exécution...
-                </>
-              ) : (
-                <>
-                  ▶ Exécuter
-                </>
-              )}
-            </button>
-
-            {isAuthenticated && (
-              <button
-                onClick={handleLogout}
-                className="px-4 py-2 bg-[#ef4444] hover:bg-[#f87171] text-white rounded-lg transition font-bold font-mono"
-              >
-                ⌂ Déconnecter
-              </button>
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Réseaux scannés (suggestions)</p>
+                  {networkSuggestions.length > 0 ? (
+                    <div className="space-y-2">
+                      {networkSuggestions.map((net) => (
+                        <div key={net.bssid} className="rounded-xl border border-slate-200 bg-white p-2.5">
+                          <div className="mb-2 text-xs text-slate-500">
+                            {net.ssid || 'SSID masqué'}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => insertArgument(net.bssid)}
+                              className="rounded-full border border-slate-200 px-2.5 py-1 text-xs font-mono text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                              disabled={loading}
+                            >
+                              BSSID: {net.bssid}
+                            </button>
+                            {net.channel && (
+                              <button
+                                type="button"
+                                onClick={() => insertArgument(String(net.channel))}
+                                className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:border-sky-300 hover:bg-sky-50"
+                                disabled={loading}
+                              >
+                                Canal: {net.channel}
+                              </button>
+                            )}
+                            {net.ssid && (
+                              <button
+                                type="button"
+                                onClick={() => insertArgument(`"${net.ssid}"`)}
+                                className="rounded-full border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:border-amber-300 hover:bg-amber-50"
+                                disabled={loading}
+                              >
+                                SSID: "{net.ssid}"
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">Aucun réseau scanné disponible. Lancez un scan dans l’onglet Vue d’ensemble.</p>
+                  )}
+                </div>
+              </div>
             )}
-          </div>
-        </div>
 
-        {/* Informations */}
-        <div className="card">
-          <h3 className="text-lg font-bold text-[#33cc00] mb-4 font-mono uppercase">
-            ⓘ Informations
-          </h3>
-          
-          <div className="space-y-3 text-sm">
-            <div className="bg-[#1a5f4a]/20 border border-[#10b981]/30 p-3 rounded font-mono">
-              <div className="font-bold text-[#34d399]">
-                ◇ Sécurité
-              </div>
-              <p className="text-[#a7f3d0] text-xs mt-1">
-                Authentification admin requise pour chaque exécution
-              </p>
+            <div className="flex gap-3">
+              <Button onClick={handleExecuteClick} disabled={!selectedCommand || loading} className="flex-1">
+                {loading ? 'Exécution…' : 'Exécuter'}
+              </Button>
+              {isAuthenticated && (
+                <Button variant="destructive" onClick={handleLogout}>
+                  Déconnecter
+                </Button>
+              )}
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="bg-[#5f4a1a]/20 border border-[#f59e0b]/30 p-3 rounded font-mono">
-              <div className="font-bold text-[#fbbf24]">
-                ▦ Whitelist
-              </div>
-              <p className="text-[#fde047] text-xs mt-1">
-                Seules les commandes sûres sont autorisées
-              </p>
+        <Card>
+          <CardHeader>
+            <CardTitle>Informations</CardTitle>
+            <CardDescription>État d’accès et garde-fous de sécurité.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-slate-600">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+              <div className="font-medium text-emerald-800">Sécurité</div>
+              <p className="mt-1 text-emerald-700">Authentification admin requise pour chaque exécution.</p>
             </div>
-
-            <div className="bg-[#1a5f3a]/20 border border-[#33cc00]/30 p-3 rounded font-mono">
-              <div className="font-bold text-[#33cc00]">
-                ✓ Statut
-              </div>
-              <p className="text-[#4dff00] text-xs mt-1">
-                {isAuthenticated ? '✓ Authentifié' : '◌ Non authentifié'}
-              </p>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="font-medium text-amber-800">Whitelist</div>
+              <p className="mt-1 text-amber-700">Seules les commandes sûres sont autorisées.</p>
             </div>
-
-            <div className="bg-[#2a2f4a]/50 border border-[#9ca3af]/30 p-3 rounded font-mono">
-              <div className="font-bold text-[#9ca3af]">
-                ⏱️ Session
-              </div>
-              <p className="text-[#b8bcc6] text-xs mt-1">
-                {isAuthenticated ? '1 heure restante' : 'Non connecté'}
-              </p>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="font-medium text-slate-800">Statut</div>
+              <p className="mt-1 text-slate-600">{isAuthenticated ? 'Authentifié' : 'Non authentifié'}</p>
             </div>
-          </div>
-        </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="font-medium text-slate-800">Session</div>
+              <p className="mt-1 text-slate-600">{isAuthenticated ? '1 heure restante' : 'Non connecté'}</p>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
-      {/* Messages d'erreur */}
-      {error && (
-        <div className="bg-[#ef4444]/15 border border-[#ef4444]/40 rounded-lg p-4">
-          <div className="text-sm text-[#fca5a5] font-mono">
-            <span className="font-bold">✕ Erreur:</span> {error}
-          </div>
-        </div>
-      )}
+      {error && <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div>}
 
-      {/* Output */}
       {output && (
-        <div className="card">
-          <h3 className="text-lg font-bold text-[#33cc00] mb-4 font-mono uppercase">
-            ↑ Résultat
-          </h3>
-          <div className="bg-[#0a0e27]/80 p-4 rounded-lg font-mono text-sm
-            text-[#33cc00] overflow-x-auto max-h-96 overflow-y-auto border border-[#2a2f4a]">
-            {output.split('\n').map((line, idx) => (
-              <div key={idx} className="leading-relaxed">{line}</div>
-            ))}
-          </div>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Résultat</CardTitle>
+            <CardDescription>Sortie brute de la commande exécutée.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <pre className="max-h-96 overflow-auto rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-sm text-emerald-300">
+              {output}
+            </pre>
+          </CardContent>
+        </Card>
       )}
 
-      {/* Modale d'authentification */}
       <AdminAuthModal
         isOpen={authModal}
         onClose={() => setAuthModal(false)}

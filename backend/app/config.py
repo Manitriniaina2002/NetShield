@@ -17,7 +17,12 @@ class Settings(BaseSettings):
     
     # CORS
     cors_origins: List[str] = Field(
-        default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"],
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+        ],
         alias="CORS_ORIGINS",
     )
     
@@ -78,7 +83,12 @@ class Settings(BaseSettings):
 
             return [origin.strip() for origin in raw.split(",") if origin.strip()]
 
-        return ["http://localhost:3000", "http://localhost:5173"]
+        return [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+        ]
 
 
 @lru_cache()

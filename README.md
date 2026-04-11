@@ -87,6 +87,8 @@ SIMULATION_MODE=False /home/kali/Desktop/NetShield/.venv/bin/python main.py
 # /home/kali/Desktop/NetShield/.venv/bin/python main.py
 ```
 
+Si vous lancez le frontend sur Vite avec `http://127.0.0.1:5173`, gardez cette origine autorisée côté backend. La configuration par défaut inclut déjà `http://localhost:5173` et `http://127.0.0.1:5173`.
+
 Validation rapide:
 
 ```bash
@@ -126,6 +128,8 @@ npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
 Interface web: http://127.0.0.1:5173
+
+Si le navigateur affiche un échec CORS sur `/api/scan/networks`, vérifiez que le backend a bien été redémarré après modification de `SIMULATION_MODE` ou `CORS_ORIGINS`.
 
 ---
 
@@ -313,6 +317,7 @@ Pour activer le mode réel (Linux uniquement):
 1. Lancer le backend avec `SIMULATION_MODE=False` (ou définir la valeur dans `backend/.env`)
 2. Vérifier les outils requis (`aircrack-ng`, `airodump-ng`, `hashcat`, etc.)
 3. Exécuter uniquement sur un environnement autorisé de laboratoire
+4. Si le frontend tourne sur `127.0.0.1`, s'assurer que l'origine est autorisée via `CORS_ORIGINS` ou la configuration par défaut
 
 Exemple:
 
