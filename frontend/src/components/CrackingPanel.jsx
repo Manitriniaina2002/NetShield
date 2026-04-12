@@ -1,6 +1,34 @@
 import React, { useState, useEffect } from 'react'
 import { wifiAPI } from '../api'
 
+const WORKFLOW_STEPS = [
+  {
+    id: 1,
+    title: 'Capturer le handshake WPA2-4way',
+    description: 'Confirmer que la capture handshake est disponible avant toute tentative de craquage.'
+  },
+  {
+    id: 2,
+    title: 'Convertir en format approprié (.hccapx pour hashcat)',
+    description: 'Préparer le fichier pour le moteur choisi afin d’éviter les erreurs de format.'
+  },
+  {
+    id: 3,
+    title: 'Utiliser GPU (hashcat) pour accélération',
+    description: 'Activer hashcat + GPU si la machine supporte l’accélération matérielle.'
+  },
+  {
+    id: 4,
+    title: 'Tester avec dictionnaire, puis règles, puis force brute (si temps)',
+    description: 'Suivre un ordre d’attaque progressif pour optimiser le temps de calcul.'
+  },
+  {
+    id: 5,
+    title: 'Considérer attaque PMKID si support 802.11w',
+    description: 'Évaluer les alternatives de collecte selon les capacités du point d’accès.'
+  }
+]
+
 function CrackingPanel({ selectedNetwork, vulnerabilities }) {
   const normalizeMethodId = (methodId) => {
     const aliases = {
@@ -26,6 +54,9 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
   const [pollingInterval, setPollingInterval] = useState(null)
   const [activeTab, setActiveTab] = useState('jobs')
   const [error, setError] = useState(null)
+  const [completedSteps, setCompletedSteps] = useState([])
+  const [activeStep, setActiveStep] = useState(1)
+  const [workflowByNetwork, setWorkflowByNetwork] = useState({})
 
   // Load cracking info on component mount
   useEffect(() => {
@@ -38,6 +69,26 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
       loadStrategy()
     }
   }, [selectedNetwork])
+
+  // Restaurer le workflow propre à chaque réseau quand la sélection change.
+  useEffect(() => {
+    const networkKey = selectedNetwork?.bssid
+    if (!networkKey) {
+      setCompletedSteps([])
+      setActiveStep(1)
+      return
+    }
+
+    const savedState = workflowByNetwork[networkKey]
+    if (savedState) {
+      setCompletedSteps(savedState.completedSteps || [])
+      setActiveStep(savedState.activeStep || 1)
+      return
+    }
+
+    setCompletedSteps([])
+    setActiveStep(1)
+  }, [selectedNetwork?.bssid])
 
   // Polling for job updates
   useEffect(() => {
@@ -214,11 +265,45 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
     return statusConfig[status] || statusConfig['failed']
   }
 
+  const toggleStepCompletion = (stepId) => {
+    const networkKey = selectedNetwork?.bssid
+    const nextCompleted = completedSteps.includes(stepId)
+      ? completedSteps.filter((id) => id !== stepId)
+      : [...completedSteps, stepId]
+
+    setCompletedSteps(nextCompleted)
+    setActiveStep(stepId)
+
+    if (networkKey) {
+      setWorkflowByNetwork((prev) => ({
+        ...prev,
+        [networkKey]: {
+          completedSteps: nextCompleted,
+          activeStep: stepId
+        }
+      }))
+    }
+
+    // Préremplissage léger pour accélérer l'exécution côté UI.
+    if (stepId === 3) {
+      setSelectedMethod('hashcat')
+      setGpuEnabled(true)
+      setActiveTab('start')
+    }
+
+    if (stepId === 4) {
+      setSelectedWordlist('academic')
+      setActiveTab('start')
+    }
+  }
+
+  const workflowProgress = Math.round((completedSteps.length / WORKFLOW_STEPS.length) * 100)
+
   return (
     <div className="space-y-6">
       {/* Tabs */}
       <div className="flex gap-1 border-b border-[#e5e7eb]">
-        {['jobs', 'strategies', 'start'].map(tab => (
+        {['jobs', 'workflow', 'strategies', 'start'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -229,11 +314,77 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
             }`}
           >
             {tab === 'jobs' && `◇ Travaux (${crackingJobs.length})`}
+            {tab === 'workflow' && `◎ Workflow (${workflowProgress}%)`}
             {tab === 'strategies' && '▦ Stratégies'}
             {tab === 'start' && '→ Lancer'}
           </button>
         ))}
       </div>
+
+      {/* Workflow Tab */}
+      {activeTab === 'workflow' && (
+        <div className="card">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <h3 className="text-lg font-bold text-[#22c55e] font-mono">◎ Workflow complet de craquage</h3>
+            <span className="rounded border border-[#22c55e]/40 bg-[#22c55e]/10 px-3 py-1 text-xs font-mono font-bold text-[#22c55e]">
+              {completedSteps.length}/{WORKFLOW_STEPS.length} étapes validées
+            </span>
+          </div>
+
+          <div className="mb-6 h-2 w-full overflow-hidden rounded-full bg-[#0a0e27]/40">
+            <div
+              className="h-full bg-gradient-to-r from-[#22c55e] to-[#4ade80] transition-all duration-300"
+              style={{ width: `${workflowProgress}%` }}
+            />
+          </div>
+
+          {!selectedNetwork ? (
+            <div className="text-center py-8 px-4">
+              <p className="text-[#9ca3af] font-mono">Sélectionnez un réseau depuis "Vue d’ensemble" pour dérouler le workflow.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {WORKFLOW_STEPS.map((step) => {
+                const completed = completedSteps.includes(step.id)
+                const active = activeStep === step.id
+
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    onClick={() => toggleStepCompletion(step.id)}
+                    className={`w-full rounded-lg border p-4 text-left transition-all ${
+                      completed
+                        ? 'border-[#22c55e]/50 bg-[#22c55e]/10'
+                        : active
+                          ? 'border-[#38bdf8]/50 bg-[#0ea5e9]/10'
+                          : 'border-[#2a2f4a] bg-gradient-to-br from-[#1a1f3a] to-[#151a3a] hover:border-[#22c55e]/40'
+                    }`}
+                  >
+                    <div className="mb-1 flex items-center gap-3">
+                      <span className={`inline-flex h-6 w-6 items-center justify-center rounded-full border text-xs font-mono font-bold ${
+                        completed
+                          ? 'border-[#22c55e] bg-[#22c55e]/20 text-[#86efac]'
+                          : 'border-[#64748b] text-[#cbd5e1]'
+                      }`}>
+                        {completed ? '✓' : step.id}
+                      </span>
+                      <p className="text-sm font-bold text-[#e5e7eb] font-mono">{step.title}</p>
+                    </div>
+                    <p className="pl-9 text-xs text-[#9ca3af] font-mono">{step.description}</p>
+                  </button>
+                )
+              })}
+
+              <div className="mt-4 rounded-lg border border-[#2a2f4a] bg-[#1a1f3a] p-4">
+                <p className="text-xs font-mono text-[#9ca3af]">
+                  Astuce: cliquez les étapes dans l’ordre, puis allez sur l’onglet "→ Lancer" pour exécuter avec les paramètres préremplis.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Jobs Tab */}
       {activeTab === 'jobs' && (
@@ -444,6 +595,42 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                 <p className="text-xs text-[#9ca3af] font-mono uppercase mb-2">Cible</p>
                 <h4 className="text-[#e5e7eb] font-mono font-bold">{selectedNetwork.ssid}</h4>
                 <p className="text-sm text-[#9ca3af] font-mono">{selectedNetwork.bssid}</p>
+              </div>
+
+              {/* Workflow Quick Steps */}
+              <div className="rounded-lg border border-[#2a2f4a] bg-[#151a3a] p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs font-bold text-[#33cc00] font-mono uppercase">Étapes du workflow</p>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('workflow')}
+                    className="rounded border border-[#22c55e]/40 bg-[#22c55e]/10 px-2 py-1 text-[11px] font-mono font-bold text-[#86efac] hover:bg-[#22c55e]/20"
+                  >
+                    Ouvrir workflow
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {WORKFLOW_STEPS.map((step) => {
+                    const completed = completedSteps.includes(step.id)
+                    return (
+                      <button
+                        key={`quick-${step.id}`}
+                        type="button"
+                        onClick={() => toggleStepCompletion(step.id)}
+                        className={`flex w-full items-center gap-2 rounded border px-3 py-2 text-left text-xs font-mono transition ${
+                          completed
+                            ? 'border-[#22c55e]/40 bg-[#22c55e]/10 text-[#86efac]'
+                            : 'border-[#334155] bg-[#0f172a]/40 text-[#cbd5e1] hover:border-[#22c55e]/40'
+                        }`}
+                      >
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-current text-[10px] font-bold">
+                          {completed ? '✓' : step.id}
+                        </span>
+                        <span>{step.title}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
 
               {/* Method Selection */}

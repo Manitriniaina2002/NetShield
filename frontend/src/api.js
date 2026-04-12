@@ -13,7 +13,14 @@ const api = axios.create({
 api.interceptors.response.use(
   response => response,
   error => {
-    console.error('Erreur API:', error.response?.data || error.message)
+    const status = error.response?.status
+    const requestUrl = error.config?.url || ''
+    const isExpectedKismetOffline = status === 503 && requestUrl.includes('/kismet/')
+
+    if (!isExpectedKismetOffline) {
+      console.error('Erreur API:', error.response?.data || error.message)
+    }
+
     return Promise.reject(error)
   }
 )

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { wifiAPI, kismetAPI } from '../api'
 import NetworkTable from './NetworkTable'
 import VulnerabilityPanel from './VulnerabilityPanel'
@@ -31,12 +31,17 @@ export function Dashboard() {
   const [reportMode, setReportMode] = useState(false)
   const [toast, setToast] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const hasInitialized = useRef(false)
   const logoSrc = '/logo-netshield.png'
 
   // Effectuer un scan réel au démarrage
   useEffect(() => {
+    if (hasInitialized.current) {
+      return
+    }
+
+    hasInitialized.current = true
     performRealScan()
-    refreshKismetData()
   }, [])
 
   useEffect(() => {
@@ -45,47 +50,41 @@ export function Dashboard() {
     }
   }, [scanSource, kismetUrl])
 
+  useEffect(() => {
+    if (activeTab === 'kismet') {
+      refreshKismetData()
+    }
+  }, [activeTab])
+
   const refreshKismetData = async () => {
     setKismetLoading(true)
     setKismetError(null)
 
     try {
-      const [statusRes, networksRes, devicesRes, alertsRes] = await Promise.allSettled([
-        kismetAPI.getStatus(kismetUrl),
+      // Vérifier d'abord le statut; si offline, éviter les appels secondaires bruyants.
+      const statusRes = await kismetAPI.getStatus(kismetUrl)
+      setKismetStatus(statusRes.data)
+
+      const [networksRes, devicesRes, alertsRes] = await Promise.all([
         kismetAPI.getNetworks(kismetUrl),
         kismetAPI.getDevices(kismetUrl),
         kismetAPI.getAlerts(kismetUrl)
       ])
 
-      if (statusRes.status === 'fulfilled') {
-        setKismetStatus(statusRes.value.data)
+      const networksPayload = networksRes.data
+      const resolvedNetworks = networksPayload.networks || networksPayload.results || []
+      setKismetNetworks(resolvedNetworks)
+      if (scanSource === 'kismet') {
+        setNetworks(resolvedNetworks)
       }
 
-      if (networksRes.status === 'fulfilled') {
-        const payload = networksRes.value.data
-        const resolvedNetworks = payload.networks || payload.results || []
-        setKismetNetworks(resolvedNetworks)
-        if (scanSource === 'kismet') {
-          setNetworks(resolvedNetworks)
-        }
-      }
+      const devicesPayload = devicesRes.data
+      setKismetDevices(devicesPayload.devices || devicesPayload.results || [])
 
-      if (devicesRes.status === 'fulfilled') {
-        const payload = devicesRes.value.data
-        setKismetDevices(payload.devices || payload.results || [])
-      }
-
-      if (alertsRes.status === 'fulfilled') {
-        const payload = alertsRes.value.data
-        setKismetAlerts(payload.alerts || payload.results || [])
-      }
-
-      const hasFailure = [statusRes, networksRes, devicesRes, alertsRes].some(result => result.status === 'rejected')
-      if (hasFailure && !kismetStatus) {
-        setKismetError('Kismet n’est pas accessible pour le moment. Vérifiez que le daemon est démarré sur ' + kismetUrl + '.')
-      }
+      const alertsPayload = alertsRes.data
+      setKismetAlerts(alertsPayload.alerts || alertsPayload.results || [])
     } catch (error) {
-      console.error('Erreur Kismet:', error)
+      setKismetStatus((prev) => ({ ...(prev || {}), status: 'offline' }))
       setKismetError(error.response?.data?.detail || error.message)
     } finally {
       setKismetLoading(false)
@@ -108,7 +107,9 @@ export function Dashboard() {
 
   const kismetBadgeLabel = scanSource === 'kismet'
     ? `Kismet ${kismetStatus?.status || 'pending'}`
-    : 'Kismet prêt'
+    : kismetStatus?.status
+      ? `Kismet ${kismetStatus.status}`
+      : 'Kismet non vérifié'
 
   const performRealScan = async (source = scanSource) => {
     setScanInProgress(true)

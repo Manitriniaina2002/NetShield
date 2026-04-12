@@ -66,8 +66,11 @@ export function KismetPanel({
 
       {error && (
         <Card className="border-rose-200 bg-rose-50/70">
-          <CardContent className="py-4 text-sm text-rose-700">
-            {error}
+          <CardContent className="space-y-2 py-4 text-sm text-rose-700">
+            <p>{error}</p>
+            <p className="text-xs text-rose-600">
+              Démarrage recommandé: <span className="font-mono">sudo kismet</span> puis cliquez sur <strong>Rafraîchir</strong>.
+            </p>
           </CardContent>
         </Card>
       )}

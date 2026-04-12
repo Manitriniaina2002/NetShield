@@ -2,6 +2,7 @@
 import asyncio
 import aiohttp
 import json
+import os
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from urllib.parse import urljoin
@@ -22,6 +23,8 @@ class KismetService:
             api_key: Clé API Kismet (optionnel)
         """
         self.api_url = api_url
+        self.username = os.getenv("KISMET_USERNAME", "netshield")
+        self.password = os.getenv("KISMET_PASSWORD", "netshield123!")
         self.api_key = api_key
         self.session: Optional[aiohttp.ClientSession] = None
 
@@ -34,7 +37,10 @@ class KismetService:
         """
         try:
             self.session = aiohttp.ClientSession()
-            async with self.session.get(f"{self.api_url}/system/status") as resp:
+            async with self.session.get(
+                f"{self.api_url}/system/status.json",
+                params={"user": self.username, "password": self.password}
+            ) as resp:
                 if resp.status == 200:
                     return True
         except Exception as e:
@@ -69,7 +75,11 @@ class KismetService:
             await self.connect()
 
         try:
-            async with self.session.get(f"{self.api_url}/devices/summary") as resp:
+            async with self.session.post(
+                f"{self.api_url}/devices/views/all/devices.json",
+                params={"user": self.username, "password": self.password},
+                json={}
+            ) as resp:
                 if resp.status == 200:
                     devices = await resp.json()
                     return devices if isinstance(devices, list) else []
@@ -88,8 +98,12 @@ class KismetService:
             await self.connect()
 
         try:
-            # Kismet endpoint pour récupérer les réseaux
-            async with self.session.get(f"{self.api_url}/phy/phy80211/networks") as resp:
+            # Kismet endpoint pour récupérer les réseaux (access points)
+            async with self.session.post(
+                f"{self.api_url}/devices/views/phydot11_accesspoints/devices.json",
+                params={"user": self.username, "password": self.password},
+                json={}
+            ) as resp:
                 if resp.status == 200:
                     networks = await resp.json()
                     return networks if isinstance(networks, list) else []
@@ -270,7 +284,10 @@ class KismetService:
             await self.connect()
 
         try:
-            async with self.session.get(f"{self.api_url}/alerts/definition") as resp:
+            async with self.session.get(
+                f"{self.api_url}/alerts/definitions.json",
+                params={"user": self.username, "password": self.password}
+            ) as resp:
                 if resp.status == 200:
                     return await resp.json()
         except Exception as e:
@@ -288,7 +305,10 @@ class KismetService:
             await self.connect()
 
         try:
-            async with self.session.get(f"{self.api_url}/system/status") as resp:
+            async with self.session.get(
+                f"{self.api_url}/system/status.json",
+                params={"user": self.username, "password": self.password}
+            ) as resp:
                 if resp.status == 200:
                     return await resp.json()
         except Exception as e:
