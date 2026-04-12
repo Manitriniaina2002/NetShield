@@ -2,6 +2,7 @@ import React from 'react'
 
 const NAV_ITEMS = [
   { id: 'overview', label: 'Vue d\'ensemble' },
+  { id: 'kismet', label: 'Kismet' },
   { id: 'vulnerabilities', label: 'Vulnérabilités' },
   { id: 'recommendations', label: 'Recommandations' },
   { id: 'cracking', label: 'Craquage' },
@@ -19,6 +20,18 @@ function TabIcon({ id }) {
         <rect x="13" y="3" width="8" height="5" rx="2" />
         <rect x="13" y="10" width="8" height="11" rx="2" />
         <rect x="3" y="13" width="8" height="8" rx="2" />
+      </svg>
+    )
+  }
+
+  if (id === 'kismet') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
+        <path d="M12 3a9 9 0 019 9" />
+        <path d="M12 7a5 5 0 015 5" />
+        <path d="M12 11a1 1 0 110 2 1 1 0 010-2z" fill="currentColor" />
+        <path d="M6.5 17.5l-1.8 1.8" />
+        <path d="M17.5 17.5l1.8 1.8" />
       </svg>
     )
   }

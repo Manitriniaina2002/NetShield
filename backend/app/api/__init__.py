@@ -6,6 +6,7 @@ from .recommendations import router as recommendations_router
 from .reports import router as reports_router
 from .commands import router as commands_router
 from .cracking import router as cracking_router
+from .kismet import router as kismet_router
 
 # Créer le routeur API principal
 api_router = APIRouter()
@@ -17,5 +18,6 @@ api_router.include_router(recommendations_router)
 api_router.include_router(reports_router)
 api_router.include_router(commands_router)
 api_router.include_router(cracking_router)
+api_router.include_router(kismet_router)
 
 __all__ = ["api_router"]

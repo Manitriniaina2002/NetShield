@@ -107,4 +107,27 @@ export const wifiAPI = {
     api.get('/cracking/handshake-capture-guide')
 }
 
+// API Kismet pour scanning avancé
+export const kismetAPI = {
+  // Scan Wi-Fi via Kismet
+  scanNetworks: (duration = 30, kismetUrl = 'http://localhost:2501', name = 'Kismet Scan') =>
+    api.post('/kismet/networks/scan', null, { params: { duration, kismet_url: kismetUrl, name } }),
+  
+  // Récupérer les réseaux actuellement suivis par Kismet
+  getNetworks: (kismetUrl = 'http://localhost:2501') =>
+    api.get('/kismet/networks', { params: { kismet_url: kismetUrl } }),
+  
+  // Récupérer tous les appareils détectés par Kismet
+  getDevices: (kismetUrl = 'http://localhost:2501') =>
+    api.get('/kismet/devices', { params: { kismet_url: kismetUrl } }),
+  
+  // Récupérer les alertes Kismet
+  getAlerts: (kismetUrl = 'http://localhost:2501') =>
+    api.get('/kismet/alerts', { params: { kismet_url: kismetUrl } }),
+  
+  // Récupérer le statut du serveur Kismet
+  getStatus: (kismetUrl = 'http://localhost:2501') =>
+    api.get('/kismet/status', { params: { kismet_url: kismetUrl } })
+}
+
 export default api

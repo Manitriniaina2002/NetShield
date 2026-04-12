@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
-import { wifiAPI } from '../api'
+import { wifiAPI, kismetAPI } from '../api'
 import NetworkTable from './NetworkTable'
 import VulnerabilityPanel from './VulnerabilityPanel'
 import RecommendationPanel from './RecommendationPanel'
 import CommandPanel from './CommandPanel'
 import CrackingPanel from './CrackingPanel'
+import KismetPanel from './KismetPanel'
 import { NavBar } from './NavBar'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -19,6 +20,14 @@ export function Dashboard() {
   const [selectedNetwork, setSelectedNetwork] = useState(null)
   const [scanStats, setScanStats] = useState(null)
   const [activeTab, setActiveTab] = useState('overview')
+  const [scanSource, setScanSource] = useState('standard')
+  const [kismetUrl, setKismetUrl] = useState('http://localhost:2501')
+  const [kismetStatus, setKismetStatus] = useState(null)
+  const [kismetNetworks, setKismetNetworks] = useState([])
+  const [kismetDevices, setKismetDevices] = useState([])
+  const [kismetAlerts, setKismetAlerts] = useState([])
+  const [kismetLoading, setKismetLoading] = useState(false)
+  const [kismetError, setKismetError] = useState(null)
   const [reportMode, setReportMode] = useState(false)
   const [toast, setToast] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
@@ -27,14 +36,88 @@ export function Dashboard() {
   // Effectuer un scan réel au démarrage
   useEffect(() => {
     performRealScan()
+    refreshKismetData()
   }, [])
 
-  const performRealScan = async () => {
+  useEffect(() => {
+    if (scanSource === 'kismet') {
+      refreshKismetData()
+    }
+  }, [scanSource, kismetUrl])
+
+  const refreshKismetData = async () => {
+    setKismetLoading(true)
+    setKismetError(null)
+
+    try {
+      const [statusRes, networksRes, devicesRes, alertsRes] = await Promise.allSettled([
+        kismetAPI.getStatus(kismetUrl),
+        kismetAPI.getNetworks(kismetUrl),
+        kismetAPI.getDevices(kismetUrl),
+        kismetAPI.getAlerts(kismetUrl)
+      ])
+
+      if (statusRes.status === 'fulfilled') {
+        setKismetStatus(statusRes.value.data)
+      }
+
+      if (networksRes.status === 'fulfilled') {
+        const payload = networksRes.value.data
+        const resolvedNetworks = payload.networks || payload.results || []
+        setKismetNetworks(resolvedNetworks)
+        if (scanSource === 'kismet') {
+          setNetworks(resolvedNetworks)
+        }
+      }
+
+      if (devicesRes.status === 'fulfilled') {
+        const payload = devicesRes.value.data
+        setKismetDevices(payload.devices || payload.results || [])
+      }
+
+      if (alertsRes.status === 'fulfilled') {
+        const payload = alertsRes.value.data
+        setKismetAlerts(payload.alerts || payload.results || [])
+      }
+
+      const hasFailure = [statusRes, networksRes, devicesRes, alertsRes].some(result => result.status === 'rejected')
+      if (hasFailure && !kismetStatus) {
+        setKismetError('Kismet n’est pas accessible pour le moment. Vérifiez que le daemon est démarré sur ' + kismetUrl + '.')
+      }
+    } catch (error) {
+      console.error('Erreur Kismet:', error)
+      setKismetError(error.response?.data?.detail || error.message)
+    } finally {
+      setKismetLoading(false)
+    }
+  }
+
+  const getUnifiedNetworks = () => {
+    if (scanSource === 'kismet' && kismetNetworks.length > 0) {
+      return kismetNetworks
+    }
+
+    return networks
+  }
+
+  const kismetBadgeVariant = kismetStatus?.status === 'online'
+    ? 'success'
+    : kismetStatus?.status === 'offline'
+      ? 'destructive'
+      : 'warning'
+
+  const kismetBadgeLabel = scanSource === 'kismet'
+    ? `Kismet ${kismetStatus?.status || 'pending'}`
+    : 'Kismet prêt'
+
+  const performRealScan = async (source = scanSource) => {
     setScanInProgress(true)
     showToast('◆ Démarrage du scan Wi-Fi...', 'info')
     try {
       console.log('◆ Démarrage d\'un scan Wi-Fi réel...')
-      const response = await wifiAPI.scanNetworks(15, 'Real Scan')
+      const response = source === 'kismet'
+        ? await kismetAPI.scanNetworks(20, kismetUrl, 'Advanced Kismet Scan')
+        : await wifiAPI.scanNetworks(15, 'Real Scan')
       
       if (response.data.networks && response.data.networks.length > 0) {
         console.log(`✓ ${response.data.networks.length} réseaux détectés`)
@@ -68,11 +151,13 @@ export function Dashboard() {
     }
   }
 
-  const handleScan = async () => {
+  const handleScan = async (source = scanSource) => {
     setScanInProgress(true)
-    showToast('◆ Démarrage d\'un scan...', 'info')
+    showToast(source === 'kismet' ? '◆ Démarrage d\'un scan Kismet...' : '◆ Démarrage d\'un scan...', 'info')
     try {
-      const response = await wifiAPI.scanNetworks(10, 'Security Audit')
+      const response = source === 'kismet'
+        ? await kismetAPI.scanNetworks(20, kismetUrl, 'Security Audit Kismet')
+        : await wifiAPI.scanNetworks(10, 'Security Audit')
       setNetworks(response.data.networks || [])
       setScanStats({
         total: response.data.networks_found,
@@ -194,12 +279,48 @@ export function Dashboard() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <Button onClick={handleScan} disabled={scanInProgress || analyzing}>
-                  {scanInProgress ? 'Scan en cours…' : analyzing ? 'Analyse en cours…' : 'Démarrer un scan'}
+                <Button onClick={() => handleScan()} disabled={scanInProgress || analyzing}>
+                  {scanInProgress ? 'Scan en cours…' : analyzing ? 'Analyse en cours…' : scanSource === 'kismet' ? 'Démarrer un scan Kismet' : 'Démarrer un scan'}
                 </Button>
                 <Button variant="secondary" onClick={generatePDF} disabled={networks.length === 0}>
                   Générer le rapport PDF
                 </Button>
+                <Badge variant={kismetBadgeVariant} className="self-center">
+                  {kismetBadgeLabel}
+                </Badge>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Card className="border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mode de scan</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setScanSource('standard')}
+                      className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${scanSource === 'standard' ? 'bg-emerald-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      Standard
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScanSource('kismet')}
+                      className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${scanSource === 'kismet' ? 'bg-emerald-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      Kismet
+                    </button>
+                  </div>
+                </Card>
+
+                <Card className="border-slate-200 bg-slate-50 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Kismet URL</p>
+                  <input
+                    type="text"
+                    value={kismetUrl}
+                    onChange={(e) => setKismetUrl(e.target.value)}
+                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                    placeholder="http://localhost:2501"
+                  />
+                </Card>
               </div>
             </div>
 
@@ -208,9 +329,9 @@ export function Dashboard() {
                 <CardHeader className="pb-2">
                   <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">NW</div>
                   <CardDescription className="text-slate-600">Réseaux détectés</CardDescription>
-                  <CardTitle className="text-3xl text-slate-900">{networks.length}</CardTitle>
+                  <CardTitle className="text-3xl text-slate-900">{getUnifiedNetworks().length}</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0"><Progress value={(networks.length / 20) * 100} /></CardContent>
+                <CardContent className="pt-0"><Progress value={(getUnifiedNetworks().length / 20) * 100} /></CardContent>
               </Card>
               <Card className="border-slate-200 bg-slate-50">
                 <CardHeader className="pb-2">
@@ -246,6 +367,24 @@ export function Dashboard() {
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <>
+              {scanSource === 'kismet' && (
+                <Card className="border-sky-200 bg-sky-50/70">
+                  <CardContent className="flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <p className="font-medium text-sky-800">Kismet activé</p>
+                      <p className="text-sm text-sky-700">
+                        {kismetStatus?.status === 'online'
+                          ? 'Le daemon Kismet répond correctement.'
+                          : 'Le frontend utilisera Kismet dès qu’il sera disponible sur l’URL configurée.'}
+                      </p>
+                    </div>
+                    <Button variant="secondary" onClick={refreshKismetData} disabled={kismetLoading}>
+                      {kismetLoading ? 'Actualisation…' : 'Actualiser Kismet'}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
               {analyzing && (
                 <Card className="border-emerald-200 bg-emerald-50/70">
                   <CardContent className="flex items-center gap-4 p-4">
@@ -258,8 +397,27 @@ export function Dashboard() {
                 </Card>
               )}
 
-              <NetworkTable networks={networks} onSelectNetwork={handleSelectNetwork} />
+              <NetworkTable networks={getUnifiedNetworks()} onSelectNetwork={handleSelectNetwork} />
             </>
+          )}
+
+          {activeTab === 'kismet' && (
+            <KismetPanel
+              status={kismetStatus}
+              networks={kismetNetworks}
+              devices={kismetDevices}
+              alerts={kismetAlerts}
+              loading={kismetLoading}
+              error={kismetError}
+              kismetUrl={kismetUrl}
+              onRefresh={refreshKismetData}
+              onScan={async () => {
+                setScanSource('kismet')
+                await handleScan('kismet')
+                await refreshKismetData()
+              }}
+              onChangeUrl={setKismetUrl}
+            />
           )}
 
           {/* Vulnerabilities Tab */}
@@ -279,7 +437,7 @@ export function Dashboard() {
 
           {/* Commands Tab */}
           {activeTab === 'commands' && (
-            <CommandPanel networks={networks} />
+            <CommandPanel networks={getUnifiedNetworks()} />
           )}
 
           {/* Report Tab */}
