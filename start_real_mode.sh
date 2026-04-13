@@ -109,8 +109,6 @@ else
     echo "   ℹ️  Lancez manuellement dans un autre terminal: sudo kismet"
     echo "   ℹ️  Logs possibles: /tmp/netshield-kismet.log ou journalctl -u kismet"
   fi
-else
-  echo "   ✅ Kismet déjà actif sur le port 2501"
 fi
 
 # Initialiser l'authentification Kismet (important!)
