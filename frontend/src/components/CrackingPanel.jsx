@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { MdCheckCircle, MdCancel, MdPlayArrow, MdPauseCircle, MdWarning, MdSave, MdRefresh } from 'react-icons/md'
 import { wifiAPI } from '../api'
 import StoredHandshakesPanel from './StoredHandshakesPanel'
 
@@ -261,10 +262,10 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'running': { bg: 'bg-blue-500/20', border: 'border-blue-500/40', text: 'text-blue-300', icon: '▶' },
-      'completed': { bg: 'bg-green-500/20', border: 'border-green-500/40', text: 'text-green-300', icon: '✓' },
-      'failed': { bg: 'bg-red-500/20', border: 'border-red-500/40', text: 'text-red-300', icon: '✕' },
-      'paused': { bg: 'bg-yellow-500/20', border: 'border-yellow-500/40', text: 'text-yellow-300', icon: '⏸' }
+      'running': { bg: 'bg-blue-500/20', border: 'border-blue-500/40', text: 'text-blue-300' },
+      'completed': { bg: 'bg-green-500/20', border: 'border-green-500/40', text: 'text-green-300' },
+      'failed': { bg: 'bg-red-500/20', border: 'border-red-500/40', text: 'text-red-300' },
+      'paused': { bg: 'bg-yellow-500/20', border: 'border-yellow-500/40', text: 'text-yellow-300' }
     }
     return statusConfig[status] || statusConfig['failed']
   }
@@ -320,7 +321,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
             {tab === 'jobs' && `◇ Travaux (${crackingJobs.length})`}
             {tab === 'workflow' && `◎ Workflow (${workflowProgress}%)`}
             {tab === 'strategies' && '▦ Stratégies'}
-            {tab === 'stored' && '💾 Captures'}
+            {tab === 'stored' && <span className="flex items-center gap-1"><MdSave /> Captures</span>}
             {tab === 'start' && '→ Lancer'}
           </button>
         ))}
@@ -372,7 +373,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                           ? 'border-[#22c55e] bg-[#22c55e]/20 text-[#86efac]'
                           : 'border-[#64748b] text-[#cbd5e1]'
                       }`}>
-                        {completed ? '✓' : step.id}
+                        {completed ? <MdCheckCircle className="text-base" /> : step.id}
                       </span>
                       <p className="text-sm font-bold text-[#e5e7eb] font-mono">{step.title}</p>
                     </div>
@@ -451,7 +452,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                     {/* Password Found */}
                     {job.password_found && (
                       <div className="bg-[#10b981]/20 border border-[#10b981]/40 rounded p-3 mb-3">
-                        <p className="text-xs text-[#10b981] font-mono font-bold mb-1">★ MOT DE PASSE TROUVÉ!</p>
+                        <p className="text-xs text-[#10b981] font-mono font-bold mb-1">MOT DE PASSE TROUVÉ!</p>
                         <p className="text-[#34d399] font-mono font-bold text-sm">{job.password_found}</p>
                       </div>
                     )}
@@ -459,7 +460,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                     {/* Error */}
                     {job.error_message && (
                       <div className="bg-[#ef4444]/20 border border-[#ef4444]/40 rounded p-3 mb-3">
-                        <p className="text-xs text-[#fca5a5] font-mono">⚠ {job.error_message}</p>
+                        <p className="text-xs text-[#fca5a5] font-mono flex items-center gap-1"><MdWarning /> {job.error_message}</p>
                       </div>
                     )}
 
@@ -477,7 +478,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                             onClick={() => handlePauseJob(job.job_id)}
                             className="px-3 py-1 bg-[#f59e0b]/20 text-[#fbbf24] rounded text-xs font-mono font-bold hover:bg-[#f59e0b]/30 border border-[#f59e0b]/40"
                           >
-                            ⏸ Pause
+                            <MdPauseCircle /> Pause
                           </button>
                           <button 
                             onClick={() => handleCancelJob(job.job_id)}
@@ -530,7 +531,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                   <div className="bg-gradient-to-br from-[#1a1f3a] to-[#151a3a] rounded-lg p-4 border border-[#2a2f4a]">
                     <p className="text-xs font-bold text-[#9ca3af] mb-2 uppercase tracking-wider">Faisabilité</p>
                     <span className={`text-sm font-bold font-mono ${strategy.viable ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
-                      {strategy.viable ? '✓ CRAQUABLE' : '✕ NON RECOMMANDÉ'}
+                      {strategy.viable ? 'CRAQUABLE' : 'NON RECOMMANDÉ'}
                     </span>
                   </div>
 
@@ -618,21 +619,21 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                 <div className="bg-gradient-to-br from-[#1a3a2a] to-[#0f2a1a] rounded-lg p-4 border border-[#2a5a3a] border-l-4 border-l-[#10b981]">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs text-[#10b981] font-mono uppercase mb-2">💾 Capture stockée sélectionnée</p>
+                      <p className="text-xs text-[#10b981] font-mono uppercase mb-2 flex items-center gap-1"><MdSave /> Capture stockée sélectionnée</p>
                       <p className="text-[#e5e7eb] font-mono font-bold">{selectedStoredHandshake.ssid}</p>
                       <p className="text-xs text-[#9ca3af] font-mono mt-1">
                         Format: {selectedStoredHandshake.file_format} | 
                         Taille: {(selectedStoredHandshake.file_size / 1024).toFixed(2)} KB
                       </p>
                       {selectedStoredHandshake.deauth_sent && (
-                        <p className="text-xs text-[#10b981] font-mono mt-1">✓ Déauthentification effectuée</p>
+                        <p className="text-xs text-[#10b981] font-mono mt-1 flex items-center gap-1"><MdCheckCircle /> Déauthentification effectuée</p>
                       )}
                     </div>
                     <button
                       onClick={() => setSelectedStoredHandshake(null)}
-                      className="px-2 py-1 text-xs rounded border border-[#ef4444] text-[#ef4444] hover:bg-[#ef4444]/10 font-mono font-bold transition"
+                      className="px-2 py-1 text-xs rounded border border-[#ef4444] text-[#ef4444] hover:bg-[#ef4444]/10 font-mono font-bold transition flex items-center gap-1"
                     >
-                      ✕ Effacer
+                      <MdCancel /> Effacer
                     </button>
                   </div>
                 </div>
@@ -665,7 +666,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                         }`}
                       >
                         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-current text-[10px] font-bold">
-                          {completed ? '✓' : step.id}
+                          {completed ? <MdCheckCircle /> : step.id}
                         </span>
                         <span>{step.title}</span>
                       </button>
@@ -726,7 +727,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
               {/* Error Display */}
               {error && (
                 <div className="bg-[#ef4444]/15 border border-[#ef4444]/40 rounded p-4">
-                  <p className="text-sm text-[#fca5a5] font-mono">⚠ {error}</p>
+                  <p className="text-sm text-[#fca5a5] font-mono flex items-center gap-1"><MdWarning /> {error}</p>
                 </div>
               )}
 

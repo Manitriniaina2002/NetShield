@@ -2,15 +2,42 @@ import React from 'react'
 import { cn } from '../../lib/utils'
 
 const variants = {
-  default: 'border-slate-200 bg-slate-50 text-slate-700',
-  success: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  warning: 'border-amber-200 bg-amber-50 text-amber-700',
-  destructive: 'border-rose-200 bg-rose-50 text-rose-700',
-  info: 'border-sky-200 bg-sky-50 text-sky-700',
+  default: 'border border-slate-300 bg-slate-100 text-slate-700 hover:bg-slate-200',
+  primary: 'border border-primary-300 bg-primary-100 text-primary-700 hover:bg-primary-200',
+  success: 'border border-accent-300 bg-accent-100 text-accent-700 hover:bg-accent-200',
+  warning: 'border border-yellow-300 bg-yellow-100 text-yellow-700 hover:bg-yellow-200',
+  destructive: 'border border-red-300 bg-red-100 text-red-700 hover:bg-red-200',
+  error: 'border border-red-300 bg-red-100 text-red-700 hover:bg-red-200',
+  info: 'border border-primary-300 bg-primary-100 text-primary-700 hover:bg-primary-200',
+  outline: 'border-2 border-current text-current bg-transparent',
 }
 
-export function Badge({ className, variant = 'default', ...props }) {
-  return <span className={cn('inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium', variants[variant], className)} {...props} />
+const sizes = {
+  sm: 'px-2 py-0.5 text-xs',
+  default: 'px-3 py-1 text-sm',
+  lg: 'px-4 py-1.5 text-base',
+}
+
+export function Badge({ 
+  className, 
+  variant = 'default', 
+  size = 'default',
+  children,
+  ...props 
+}) {
+  return (
+    <span 
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full font-medium transition-colors duration-200 whitespace-nowrap',
+        variants[variant],
+        sizes[size],
+        className
+      )} 
+      {...props}
+    >
+      {children}
+    </span>
+  )
 }
 
 export default Badge

@@ -90,6 +90,22 @@ class Settings(BaseSettings):
             "http://127.0.0.1:5173",
         ]
 
+    @field_validator("simulation_mode", "require_confirmation", mode="before")
+    @classmethod
+    def parse_booleans(cls, value: Any) -> bool:
+        """Parse string environment variables to boolean."""
+        if isinstance(value, bool):
+            return value
+        
+        if isinstance(value, str):
+            value_lower = value.strip().lower()
+            if value_lower in ("true", "1", "yes", "on"):
+                return True
+            elif value_lower in ("false", "0", "no", "off"):
+                return False
+        
+        return bool(value)
+
 
 @lru_cache()
 def get_settings() -> Settings:

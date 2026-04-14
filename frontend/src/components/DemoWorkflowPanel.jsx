@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { MdTarget, MdChecklist, MdGlobe, MdLock, MdShowChart, MdRefresh, MdPlayArrow } from 'react-icons/md'
 import { Card } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
@@ -84,7 +85,7 @@ export const DemoWorkflowPanel = () => {
       {/* Overall Statistics */}
       {statistics && (
         <Card className="p-6 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-          <h2 className="text-2xl font-bold mb-6 text-blue-900">🎯 NetShield Demo Workflow</h2>
+          <h2 className="text-2xl font-bold mb-6 text-blue-900 flex items-center gap-2"><MdTarget /> NetShield Demo Workflow</h2>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <div className="text-center p-3 bg-white rounded border border-blue-200">
@@ -134,7 +135,7 @@ export const DemoWorkflowPanel = () => {
       {/* Workflow Steps */}
       {workflowData && (
         <Card className="p-6">
-          <h3 className="text-xl font-bold mb-4">📋 Audit Workflow Steps</h3>
+          <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><MdChecklist /> Audit Workflow Steps</h3>
           
           <div className="space-y-4">
             {workflowData.steps.map((step, idx) => (
@@ -175,7 +176,7 @@ export const DemoWorkflowPanel = () => {
                           <ul className="space-y-1">
                             {step.key_findings.map((finding, i) => (
                               <li key={i} className="text-sm text-gray-700 flex gap-2">
-                                <span className="text-blue-500">▶</span>
+                                <MdPlayArrow className="text-blue-500 flex-shrink-0" />
                                 <span>{finding}</span>
                               </li>
                             ))}
@@ -194,7 +195,7 @@ export const DemoWorkflowPanel = () => {
       {/* Networks Summary */}
       {networks.length > 0 && (
         <Card className="p-6">
-          <h3 className="text-xl font-bold mb-4">🌐 Scanned Networks</h3>
+          <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><MdGlobe /> Scanned Networks</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-100">
@@ -236,7 +237,7 @@ export const DemoWorkflowPanel = () => {
       {/* Cracking Results */}
       {crackingResults.length > 0 && (
         <Card className="p-6">
-          <h3 className="text-xl font-bold mb-4">🔓 Password Cracking Results</h3>
+          <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><MdLock /> Password Cracking Results</h3>
           <div className="space-y-3">
             {crackingResults.map((attempt, idx) => (
               <div key={idx} className="p-4 border rounded bg-white hover:bg-gray-50">
@@ -276,7 +277,7 @@ export const DemoWorkflowPanel = () => {
 
                 {attempt.gpu_enabled && (
                   <div className="mt-2">
-                    <Badge className="bg-purple-200 text-purple-800">📊 GPU Enabled</Badge>
+                    <Badge className="bg-purple-200 text-purple-800 flex items-center gap-1"><MdShowChart /> GPU Enabled</Badge>
                   </div>
                 )}
               </div>
@@ -290,9 +291,9 @@ export const DemoWorkflowPanel = () => {
         <Button 
           onClick={fetchDemoData}
           disabled={loading}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
+          className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
         >
-          🔄 Refresh Demo Data
+          <MdRefresh /> Refresh Demo Data
         </Button>
       </div>
 

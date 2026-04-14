@@ -1,134 +1,174 @@
-import React from 'react'
+import React, { useState } from 'react'
+import { MdDashboard, MdWarning, MdLock, MdHandshake, MdLightbulb, MdSignalCellularAlt, MdTerminal, MdDescription, MdWifi } from 'react-icons/md'
 
 const NAV_ITEMS = [
-  { id: 'overview', label: 'Vue d\'ensemble' },
-  { id: 'kismet', label: 'Kismet' },
-  { id: 'handshake', label: 'Capture de Handshake' },
-  { id: 'vulnerabilities', label: 'Vulnérabilités' },
-  { id: 'recommendations', label: 'Recommandations' },
-  { id: 'cracking', label: 'Craquage' },
-  { id: 'commands', label: 'Commandes' },
-  { id: 'report', label: 'Rapport' }
+  { 
+    id: 'overview', 
+    label: 'Vue d\'ensemble',
+    icon: MdDashboard
+  },
+  { 
+    id: 'vulnerabilities', 
+    label: 'Vulnérabilités',
+    icon: MdWarning
+  },
+  { 
+    id: 'cracking', 
+    label: 'Craquage',
+    icon: MdLock
+  },
+  { 
+    id: 'handshake', 
+    label: 'Handshakes',
+    icon: MdHandshake
+  },
+  { 
+    id: 'recommendations', 
+    label: 'Recommandations',
+    icon: MdLightbulb
+  },
+  { 
+    id: 'kismet', 
+    label: 'Kismet',
+    icon: MdSignalCellularAlt
+  },
+  { 
+    id: 'commands', 
+    label: 'Commandes',
+    icon: MdTerminal
+  },
+  { 
+    id: 'report', 
+    label: 'Rapport',
+    icon: MdDescription
+  }
 ]
 
-function TabIcon({ id }) {
-  const base = 'h-3.5 w-3.5'
-
-  if (id === 'overview') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
-        <rect x="3" y="3" width="8" height="8" rx="2" />
-        <rect x="13" y="3" width="8" height="5" rx="2" />
-        <rect x="13" y="10" width="8" height="11" rx="2" />
-        <rect x="3" y="13" width="8" height="8" rx="2" />
-      </svg>
-    )
-  }
-
-  if (id === 'kismet') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
-        <path d="M12 3a9 9 0 019 9" />
-        <path d="M12 7a5 5 0 015 5" />
-        <path d="M12 11a1 1 0 110 2 1 1 0 010-2z" fill="currentColor" />
-        <path d="M6.5 17.5l-1.8 1.8" />
-        <path d="M17.5 17.5l1.8 1.8" />
-      </svg>
-    )
-  }
-
-  if (id === 'vulnerabilities') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
-        <path d="M12 3l9 4.5v5.5c0 5-3.5 8-9 10-5.5-2-9-5-9-10V7.5L12 3z" />
-        <path d="M12 8v5" />
-        <circle cx="12" cy="16" r="1" fill="currentColor" />
-      </svg>
-    )
-  }
-
-  if (id === 'recommendations') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
-        <path d="M12 3v10" />
-        <path d="M8 11a4 4 0 118 0" />
-        <path d="M9 17h6" />
-        <path d="M10 21h4" />
-      </svg>
-    )
-  }
-
-  if (id === 'cracking') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
-        <rect x="4" y="11" width="16" height="10" rx="2" />
-        <path d="M8 11V8a4 4 0 018 0v3" />
-        <path d="M12 15v2" />
-      </svg>
-    )
-  }
-
-  if (id === 'handshake') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
-        <path d="M10 10c0 2-2 4-4 4s-4-2-4-4 2-4 4-4 4 2 4 4z" />
-        <path d="M14 10c0 2 2 4 4 4s4-2 4-4-2-4-4-4-4 2-4 4z" />
-        <path d="M6 14v4" />
-        <path d="M18 14v4" />
-        <path d="M12 18v3" />
-      </svg>
-    )
-  }
-
-  if (id === 'commands') {
-    return (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
-        <path d="M4 7l4 4-4 4" />
-        <path d="M10 17h10" />
-      </svg>
-    )
-  }
+export function NavBar({ activeTab, onTabChange, onScan, scanInProgress = false }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
-      <path d="M7 3h7l5 5v13H7z" />
-      <path d="M14 3v6h6" />
-      <path d="M10 13h6" />
-      <path d="M10 17h4" />
-    </svg>
-  )
-}
+    <>
+      {/* Main Navbar */}
+      <nav className="sticky top-0 z-40 bg-white shadow-md border-b border-slate-100">
+        <div className="mx-auto max-w-full px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo Area */}
+            <div className="flex items-center gap-3 flex-1 md:flex-none">
+              <div className="flex items-center justify-center h-10 w-10 rounded-lg overflow-hidden bg-white border border-slate-200 shadow-sm">
+                <img 
+                  src="/logo-netshield.png"
+                  alt="NetShield logo"
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div className="hidden md:block">
+                <h1 className="text-xl font-bold text-slate-900">NetShield</h1>
+                <p className="text-xs text-slate-500">Security Auditor</p>
+              </div>
+            </div>
 
-export function NavBar({ activeTab, onTabChange }) {
-  return (
-    <nav className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur-md">
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex overflow-x-auto">
-          {NAV_ITEMS.map(item => (
-            <button
-              key={item.id}
-              onClick={() => onTabChange(item.id)}
-              className={`inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-4 text-sm font-medium transition-all duration-200 ${
-                activeTab === item.id
-                  ? 'border-emerald-600 bg-emerald-50/70 text-emerald-700'
-                  : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900'
-              }`}
-              aria-current={activeTab === item.id ? 'page' : undefined}
-            >
-              <span
-                className={`inline-flex h-6 w-6 items-center justify-center rounded-full transition-transform duration-200 ${
-                  activeTab === item.id
-                    ? 'scale-105 bg-emerald-100 text-emerald-700'
-                    : 'bg-slate-100 text-slate-500'
-                }`}
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center gap-1">
+              {NAV_ITEMS.map(item => {
+                const IconComponent = item.icon
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => onTabChange(item.id)}
+                    className={`group relative px-3 py-2 rounded-lg transition-all duration-200 text-sm font-medium ${
+                      activeTab === item.id
+                        ? 'bg-primary-50 text-primary-700 shadow-sm'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    }`}
+                    aria-current={activeTab === item.id ? 'page' : undefined}
+                  >
+                    <span className="flex items-center gap-2">
+                      <IconComponent className="text-lg" />
+                      <span className="hidden lg:inline">{item.label}</span>
+                    </span>
+                    {activeTab === item.id && (
+                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary-600 rounded-t-full animate-fade-in" />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+
+            {/* Scan Button */}
+            {onScan && (
+              <button
+                onClick={onScan}
+                disabled={scanInProgress}
+                className="hidden md:flex items-center gap-2 ml-4 px-4 py-2.5 rounded-lg bg-gradient-to-r from-primary-600 to-primary-700 text-white font-medium text-sm hover:from-primary-700 hover:to-primary-800 shadow-md hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <TabIcon id={item.id} />
-              </span>
-              <span>{item.label}</span>
+                <MdWifi className={`text-lg ${scanInProgress ? 'animate-spin' : ''}`} />
+                <span>{scanInProgress ? 'Scan...' : 'Scan'}</span>
+              </button>
+            )}
+
+            {/* Mobile Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="md:hidden p-2 rounded-lg hover:bg-slate-100 text-slate-600"
+              aria-label="Menu"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             </button>
-          ))}
+          </div>
+
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <div className="md:hidden pb-4 animate-fade-down">
+              <div className="flex flex-wrap gap-2 mb-3">
+                {/* Mobile Scan Button */}
+                {onScan && (
+                  <button
+                    onClick={() => {
+                      onScan()
+                      setMobileMenuOpen(false)
+                    }}
+                    disabled={scanInProgress}
+                    className="w-full px-3 py-2 rounded-lg transition-all duration-200 text-sm font-medium bg-gradient-to-r from-primary-600 to-primary-700 text-white hover:from-primary-700 hover:to-primary-800 shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <MdWifi className={`text-base ${scanInProgress ? 'animate-spin' : ''}`} />
+                    <span>{scanInProgress ? 'Scan en cours...' : 'Démarrer un scan'}</span>
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {NAV_ITEMS.map(item => {
+                  const IconComponent = item.icon
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        onTabChange(item.id)
+                        setMobileMenuOpen(false)
+                      }}
+                      className={`flex-1 min-w-[calc(50%-4px)] px-3 py-2 rounded-lg transition-all duration-200 text-xs font-medium ${
+                        activeTab === item.id
+                          ? 'bg-primary-600 text-white shadow-md'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        <IconComponent className="text-lg" />
+                        <span>{item.label}</span>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-    </nav>
+      </nav>
+
+      {/* Scroll Indicator */}
+      <div className="hidden md:block h-1 bg-gradient-to-r from-primary-600 via-accent-600 to-primary-600 opacity-0 group-has-scroll:opacity-100 transition-opacity duration-200" />
+    </>
   )
 }

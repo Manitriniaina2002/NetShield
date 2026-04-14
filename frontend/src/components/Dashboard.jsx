@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { MdWifi, MdWarning, MdLightbulb, MdDashboard } from 'react-icons/md'
 import { wifiAPI, kismetAPI } from '../api'
 import NetworkTable from './NetworkTable'
 import VulnerabilityPanel from './VulnerabilityPanel'
@@ -114,30 +115,30 @@ export function Dashboard() {
 
   const performRealScan = async (source = scanSource) => {
     setScanInProgress(true)
-    showToast('◆ Démarrage du scan Wi-Fi...', 'info')
+    showToast('Démarrage du scan Wi-Fi...', 'info')
     try {
-      console.log('◆ Démarrage d\'un scan Wi-Fi réel...')
+      console.log('Démarrage d\'un scan Wi-Fi réel...')
       const response = source === 'kismet'
         ? await kismetAPI.scanNetworks(20, kismetUrl, 'Advanced Kismet Scan')
         : await wifiAPI.scanNetworks(15, 'Real Scan')
       
       if (response.data.networks && response.data.networks.length > 0) {
-        console.log(`✓ ${response.data.networks.length} réseaux détectés`)
+        console.log(`${response.data.networks.length} réseaux détectés`)
         setNetworks(response.data.networks)
-        showToast(`✓ ${response.data.networks.length} réseaux détectés`, 'success')
+        showToast(`${response.data.networks.length} réseaux détectés`, 'success')
         
         // Analyser automatiquement les réseaux détectés
         await analyzeNetworks(response.data.networks)
       } else {
-        console.warn('⚠ Aucun réseau détecté lors du scan')
-        showToast('⚠ Aucun réseau détecté', 'warning')
+        console.warn('Aucun réseau détecté lors du scan')
+        showToast('Aucun réseau détecté', 'warning')
         setNetworks([])
       }
       
       // Show scan mode
       const scanMode = response.data.mode || 'simulation'
       if (scanMode === 'simulation_fallback') {
-        showToast('ⓘ Scan en mode simulation (fallback)', 'warning')
+        showToast('Scan en mode simulation (fallback)', 'warning')
       }
       
       setScanStats({
@@ -145,8 +146,8 @@ export function Dashboard() {
         timestamp: new Date().toLocaleTimeString('fr-FR')
       })
     } catch (error) {
-      console.error('✗ Erreur lors du scan réel:', error)
-      showToast('✗ Erreur lors du scan: ' + (error.response?.data?.detail || error.message), 'error')
+      console.error('Erreur lors du scan réel:', error)
+      showToast('Erreur lors du scan: ' + (error.response?.data?.detail || error.message), 'error')
       setNetworks([])
     } finally {
       setScanInProgress(false)
@@ -155,7 +156,7 @@ export function Dashboard() {
 
   const handleScan = async (source = scanSource) => {
     setScanInProgress(true)
-    showToast(source === 'kismet' ? '◆ Démarrage d\'un scan Kismet...' : '◆ Démarrage d\'un scan...', 'info')
+    showToast(source === 'kismet' ? 'Démarrage d\'un scan Kismet...' : 'Démarrage d\'un scan...', 'info')
     try {
       const response = source === 'kismet'
         ? await kismetAPI.scanNetworks(20, kismetUrl, 'Security Audit Kismet')
@@ -165,7 +166,7 @@ export function Dashboard() {
         total: response.data.networks_found,
         timestamp: new Date().toLocaleTimeString('fr-FR')
       })
-      showToast(`✓ ${response.data.networks_found} réseaux trouvés`, 'success')
+      showToast(`${response.data.networks_found} réseaux trouvés`, 'success')
       // Analyser automatiquement
       await analyzeNetworks(response.data.networks)
     } catch (error) {
@@ -179,7 +180,7 @@ export function Dashboard() {
   const analyzeNetworks = async (nets) => {
     setAnalyzing(true)
     try {
-      showToast('◆ Analyse en cours...', 'info')
+      showToast('Analyse en cours...', 'info')
       const result = await wifiAPI.analyzeBatch(nets)
       setVulnerabilities(result.data.vulnerabilities || [])
       
@@ -189,7 +190,7 @@ export function Dashboard() {
         nets
       )
       setRecommendations(recsResponse.data || [])
-      showToast('✓ Analyse completée', 'success')
+      showToast('Analyse completée', 'success')
     } catch (error) {
       console.error('Erreur lors de l\'analyse:', error)
       showToast('✗ Erreur lors de l\'analyse', 'error')
@@ -244,7 +245,7 @@ export function Dashboard() {
       document.body.appendChild(link)
       link.click()
       link.remove()
-      showToast('✓ Rapport PDF téléchargé', 'success')
+      showToast('Rapport PDF téléchargé', 'success')
     } catch (error) {
       console.error('Erreur PDF:', error)
       showToast('✗ Erreur lors de la génération du PDF', 'error')
@@ -253,7 +254,7 @@ export function Dashboard() {
 
   return (
     <div className="min-h-screen">
-      <NavBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <NavBar activeTab={activeTab} onTabChange={setActiveTab} onScan={handleScan} scanInProgress={scanInProgress} />
 
       {toast && (
         <div className="fixed right-4 top-4 z-50 animate-fade-up">
@@ -270,98 +271,53 @@ export function Dashboard() {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <Card className="mb-8 overflow-hidden border-slate-200 bg-white/90">
-          <div className="grid gap-6 border-b border-slate-200 p-6 lg:grid-cols-[1.5fr_1fr] lg:p-8">
-            <div className="space-y-4">
-              <div className="h-24 w-24 overflow-hidden rounded-3xl border border-slate-200 bg-slate-100 shadow-sm sm:h-28 sm:w-28">
-                <img
-                  src={logoSrc}
-                  alt="NetShield logo"
-                  className="h-full w-full object-cover"
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={() => handleScan()} disabled={scanInProgress || analyzing}>
-                  {scanInProgress ? 'Scan en cours…' : analyzing ? 'Analyse en cours…' : scanSource === 'kismet' ? 'Démarrer un scan Kismet' : 'Démarrer un scan'}
-                </Button>
-                <Button variant="secondary" onClick={generatePDF} disabled={networks.length === 0}>
-                  Générer le rapport PDF
-                </Button>
-                <Badge variant={kismetBadgeVariant} className="self-center">
-                  {kismetBadgeLabel}
-                </Badge>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Card className="border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mode de scan</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setScanSource('standard')}
-                      className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${scanSource === 'standard' ? 'bg-emerald-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-                    >
-                      Standard
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setScanSource('kismet')}
-                      className={`rounded-full px-3 py-1.5 text-sm font-medium transition ${scanSource === 'kismet' ? 'bg-emerald-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-                    >
-                      Kismet
-                    </button>
-                  </div>
-                </Card>
-
-                <Card className="border-slate-200 bg-slate-50 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Kismet URL</p>
-                  <input
-                    type="text"
-                    value={kismetUrl}
-                    onChange={(e) => setKismetUrl(e.target.value)}
-                    className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-                    placeholder="http://localhost:2501"
-                  />
-                </Card>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Card className="border-slate-200 bg-slate-50">
-                <CardHeader className="pb-2">
-                  <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-sky-700">NW</div>
-                  <CardDescription className="text-slate-600">Réseaux détectés</CardDescription>
-                  <CardTitle className="text-3xl text-slate-900">{getUnifiedNetworks().length}</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0"><Progress value={(getUnifiedNetworks().length / 20) * 100} /></CardContent>
-              </Card>
-              <Card className="border-slate-200 bg-slate-50">
-                <CardHeader className="pb-2">
-                  <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-rose-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-rose-700">VL</div>
-                  <CardDescription className="text-slate-600">Vulnérabilités</CardDescription>
-                  <CardTitle className="text-3xl text-slate-900">{vulnerabilities.length}</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0"><Progress value={(vulnerabilities.length / 50) * 100} /></CardContent>
-              </Card>
-              <Card className="border-slate-200 bg-slate-50">
-                <CardHeader className="pb-2">
-                  <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">RC</div>
-                  <CardDescription className="text-slate-600">Recommandations</CardDescription>
-                  <CardTitle className="text-3xl text-slate-900">{recommendations.length}</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0"><Progress value={(recommendations.length / 30) * 100} /></CardContent>
-              </Card>
-              <Card className="border-slate-200 bg-slate-50">
-                <CardHeader className="pb-2">
-                  <div className="mb-2 inline-flex w-fit items-center gap-2 rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">RS</div>
-                  <CardDescription className="text-slate-600">Score de risque</CardDescription>
-                  <CardTitle className={`text-3xl ${getRiskScore() > 70 ? 'text-rose-600' : 'text-amber-600'}`}>
-                    {getRiskScore().toFixed(0)}<span className="text-base text-slate-500">/100</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0"><Progress value={getRiskScore()} /></CardContent>
-              </Card>
-            </div>
+          <div className="grid gap-3 p-6 sm:grid-cols-2 lg:p-8 lg:grid-cols-4">
+            <Card className="border-slate-200 bg-slate-50">
+              <CardHeader className="pb-2">
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-sky-100 px-3 py-1.5 w-fit">
+                  <MdWifi className="text-base text-sky-700" />
+                  <span className="text-xs font-semibold uppercase text-sky-700">Réseaux</span>
+                </div>
+                <CardDescription className="text-slate-600">Détectés</CardDescription>
+                <CardTitle className="text-3xl text-slate-900">{getUnifiedNetworks().length}</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0"><Progress value={(getUnifiedNetworks().length / 20) * 100} /></CardContent>
+            </Card>
+            <Card className="border-slate-200 bg-slate-50">
+              <CardHeader className="pb-2">
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-rose-100 px-3 py-1.5 w-fit">
+                  <MdWarning className="text-base text-rose-700" />
+                  <span className="text-xs font-semibold uppercase text-rose-700">Vulnérabilités</span>
+                </div>
+                <CardDescription className="text-slate-600">Identifiées</CardDescription>
+                <CardTitle className="text-3xl text-slate-900">{vulnerabilities.length}</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0"><Progress value={(vulnerabilities.length / 50) * 100} /></CardContent>
+            </Card>
+            <Card className="border-slate-200 bg-slate-50">
+              <CardHeader className="pb-2">
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-amber-100 px-3 py-1.5 w-fit">
+                  <MdLightbulb className="text-base text-amber-700" />
+                  <span className="text-xs font-semibold uppercase text-amber-700">Recommandations</span>
+                </div>
+                <CardDescription className="text-slate-600">À appliquer</CardDescription>
+                <CardTitle className="text-3xl text-slate-900">{recommendations.length}</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0"><Progress value={(recommendations.length / 30) * 100} /></CardContent>
+            </Card>
+            <Card className="border-slate-200 bg-slate-50">
+              <CardHeader className="pb-2">
+                <div className="mb-2 flex items-center gap-2 rounded-lg bg-emerald-100 px-3 py-1.5 w-fit">
+                  <MdDashboard className="text-base text-emerald-700" />
+                  <span className="text-xs font-semibold uppercase text-emerald-700">Score</span>
+                </div>
+                <CardDescription className="text-slate-600">De risque</CardDescription>
+                <CardTitle className={`text-3xl ${getRiskScore() > 70 ? 'text-rose-600' : 'text-amber-600'}`}>
+                  {getRiskScore().toFixed(0)}<span className="text-base text-slate-500">/100</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0"><Progress value={getRiskScore()} /></CardContent>
+            </Card>
           </div>
         </Card>
 

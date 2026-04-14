@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { MdCheckCircle } from 'react-icons/md'
 import { Card } from './ui/card'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
@@ -81,7 +82,7 @@ export const StoredHandshakesPanel = ({ onSelectHandshake, selectedNetwork = nul
 
   const getStatusBadge = (handshake) => {
     if (handshake.success && handshake.handshake_found) {
-      return <Badge className="bg-green-500 text-white">✓ Succès</Badge>
+      return <Badge className="bg-green-500 text-white flex items-center gap-1 w-fit"><MdCheckCircle /> Succès</Badge>
     }
     if (handshake.success) {
       return <Badge className="bg-blue-500 text-white">Capturé</Badge>
@@ -221,8 +222,8 @@ export const StoredHandshakesPanel = ({ onSelectHandshake, selectedNetwork = nul
         {/* Selected Handshake Info */}
         {selectedHandshake && (
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
-            <div className="text-sm font-medium text-blue-900">
-              ✓ Handshake sélectionné
+            <div className="text-sm font-medium text-blue-900 flex items-center gap-2">
+              <MdCheckCircle className="text-green-600" /> Handshake sélectionné
             </div>
             <div className="text-sm text-blue-800 mt-1">
               {selectedHandshake.network_ssid} ({selectedHandshake.network_bssid})

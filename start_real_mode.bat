@@ -115,11 +115,11 @@ echo.
 echo [3/4] Starting Backend in REAL MODE...
 echo.
 echo Launching: python main.py
-echo Environment: SIMULATION_MODE=False
+echo Environment: SIMULATION_MODE=false
 echo.
 timeout /t 2 /nobreak
 
-start "NetShield Backend - Real Mode" cmd /k python main.py
+start "NetShield Backend - Real Mode" cmd /k "set SIMULATION_MODE=false& python main.py"
 if errorlevel 1 (
     echo ❌ ERROR: Failed to start backend
     pause
