@@ -114,6 +114,15 @@ async def startup_event():
     logger.info(f"Démarrage de {settings.app_name} v{settings.app_version}")
     logger.info(f"Mode simulation: {settings.simulation_mode}")
     logger.info(f"Debug: {settings.debug}")
+    
+    # Initialiser la base de données
+    try:
+        from app.models.database import get_db_engine, init_db
+        engine = get_db_engine()
+        init_db(engine)
+        logger.info("Base de données initialisée avec succès")
+    except Exception as e:
+        logger.error(f"Erreur lors de l'initialisation de la base de données: {str(e)}")
 
 
 @app.on_event("shutdown")

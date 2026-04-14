@@ -1,8 +1,9 @@
 """Routes API pour les opérations de craquage de mots de passe."""
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 import asyncio
+from sqlalchemy.orm import Session
 
 from app.services.cracking import (
     CrackingService,
@@ -10,9 +11,22 @@ from app.services.cracking import (
     CrackingJob,
 )
 from app.services.wifi_scan import WiFiScanService
+from app.services.database_service import DatabaseService
 from app.config import get_settings
+from app.models.database import get_db_engine, get_session_maker
 
 router = APIRouter(prefix="/api/cracking", tags=["Cracking"])
+
+
+def get_db():
+    """Dependency pour obtenir une session de base de donnees."""
+    engine = get_db_engine()
+    SessionLocal = get_session_maker(engine)
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 class StartCrackingRequest(BaseModel):
@@ -21,6 +35,7 @@ class StartCrackingRequest(BaseModel):
     method: CrackingMethod = CrackingMethod.AIRCRACK_NG
     wordlist: str = "rockyou"  # rockyou, common, academic
     gpu_enabled: bool = False
+    handshake_id: Optional[int] = None  # ID de la capture stockée
 
 
 class CrackingStatusResponse(BaseModel):
@@ -77,7 +92,7 @@ async def get_available_wordlists():
 
 
 @router.post("/start")
-async def start_cracking_job(request: StartCrackingRequest):
+async def start_cracking_job(request: StartCrackingRequest, db: Session = Depends(get_db)):
     """
     Démarre un travail de craquage de mot de passe pour un réseau.
     
@@ -101,6 +116,22 @@ async def start_cracking_job(request: StartCrackingRequest):
         # À implémenter: vérifier les privilèges admin
         pass
     
+    # Récupérer le chemin du fichier handshake
+    handshake_file = "/tmp/capture.cap"
+    handshake_db_id = None
+    network_ssid = f"Network_{request.network_bssid.replace(':', '')[-6:]}"
+    if request.handshake_id:
+        # Récupérer le handshake stocké depuis la base de données
+        try:
+            handshake = DatabaseService.get_handshake_by_db_id(db, request.handshake_id)
+            if not handshake:
+                raise HTTPException(status_code=404, detail=f"Handshake {request.handshake_id} non trouvé")
+            handshake_file = handshake.capture_file_path or handshake_file
+            handshake_db_id = handshake.id
+            network_ssid = handshake.network_ssid or network_ssid
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erreur lors de la récupération du handshake: {str(e)}")
+    
     # Chercher le réseau
     try:
         # Pour l'API, on crée simplement le job
@@ -108,7 +139,7 @@ async def start_cracking_job(request: StartCrackingRequest):
         job = CrackingService.create_job(
             network=type('obj', (object,), {
                 'bssid': request.network_bssid,
-                'ssid': f"Network_{request.network_bssid.replace(':', '')[-6:]}",
+                'ssid': network_ssid,
                 'channel': 1,
                 'signal_strength': -50,
                 'security': 'WPA2'
@@ -124,11 +155,30 @@ async def start_cracking_job(request: StartCrackingRequest):
             wordlist_path = CrackingService.generate_common_wordlist()
         elif request.wordlist == "academic":
             wordlist_path = CrackingService.generate_academic_wordlist()
+
+        # Enregistrer la tentative de craquage en base
+        try:
+            DatabaseService.save_cracking_attempt(
+                db=db,
+                attempt_id=job.job_id,
+                network_ssid=job.network_ssid,
+                network_bssid=job.network_bssid,
+                cracking_method=job.method.value,
+                wordlist_path=wordlist_path,
+                wordlist_name=request.wordlist,
+                handshake_id=handshake_db_id,
+                wordlist_size=job.wordlist_size,
+                gpu_enabled=request.gpu_enabled,
+                notes="Attempt started from /api/cracking/start"
+            )
+        except Exception:
+            # Ne bloque pas le workflow si la persistance échoue.
+            pass
         
         # Lancer le job directement en arrière-plan (sans await bloking)
         await CrackingService.launch_cracking_job_background(
             job=job,
-            handshake_file="/tmp/capture.cap",
+            handshake_file=handshake_file,
             wordlist_path=wordlist_path
         )
         

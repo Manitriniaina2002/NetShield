@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { wifiAPI } from '../api'
+import StoredHandshakesPanel from './StoredHandshakesPanel'
 
 const WORKFLOW_STEPS = [
   {
@@ -57,6 +58,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
   const [completedSteps, setCompletedSteps] = useState([])
   const [activeStep, setActiveStep] = useState(1)
   const [workflowByNetwork, setWorkflowByNetwork] = useState({})
+  const [selectedStoredHandshake, setSelectedStoredHandshake] = useState(null)
 
   // Load cracking info on component mount
   useEffect(() => {
@@ -158,7 +160,8 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
         selectedNetwork.bssid,
         normalizeMethodId(selectedMethod),
         selectedWordlist,
-        gpuEnabled
+        gpuEnabled,
+        selectedStoredHandshake ? selectedStoredHandshake.id : null
       )
 
       const newJob = {
@@ -171,7 +174,8 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
         wordlist: selectedWordlist,
         startTime: new Date(),
         password_found: null,
-        error_message: null
+        error_message: null,
+        handshake_id: selectedStoredHandshake ? selectedStoredHandshake.id : null
       }
 
       setCrackingJobs([...crackingJobs, newJob])
@@ -303,7 +307,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
     <div className="space-y-6">
       {/* Tabs */}
       <div className="flex gap-1 border-b border-[#e5e7eb]">
-        {['jobs', 'workflow', 'strategies', 'start'].map(tab => (
+        {['jobs', 'workflow', 'strategies', 'stored', 'start'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -316,6 +320,7 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
             {tab === 'jobs' && `◇ Travaux (${crackingJobs.length})`}
             {tab === 'workflow' && `◎ Workflow (${workflowProgress}%)`}
             {tab === 'strategies' && '▦ Stratégies'}
+            {tab === 'stored' && '💾 Captures'}
             {tab === 'start' && '→ Lancer'}
           </button>
         ))}
@@ -580,6 +585,17 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
         </div>
       )}
 
+      {/* Stored Handshakes Tab */}
+      {activeTab === 'stored' && (
+        <StoredHandshakesPanel 
+          selectedNetwork={selectedNetwork}
+          onSelectHandshake={(handshake) => {
+            setSelectedStoredHandshake(handshake)
+            setActiveTab('start')
+          }}
+        />
+      )}
+
       {/* Start Cracking Tab */}
       {activeTab === 'start' && (
         <div className="card">
@@ -596,6 +612,31 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                 <h4 className="text-[#e5e7eb] font-mono font-bold">{selectedNetwork.ssid}</h4>
                 <p className="text-sm text-[#9ca3af] font-mono">{selectedNetwork.bssid}</p>
               </div>
+
+              {/* Stored Handshake Selection */}
+              {selectedStoredHandshake && (
+                <div className="bg-gradient-to-br from-[#1a3a2a] to-[#0f2a1a] rounded-lg p-4 border border-[#2a5a3a] border-l-4 border-l-[#10b981]">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs text-[#10b981] font-mono uppercase mb-2">💾 Capture stockée sélectionnée</p>
+                      <p className="text-[#e5e7eb] font-mono font-bold">{selectedStoredHandshake.ssid}</p>
+                      <p className="text-xs text-[#9ca3af] font-mono mt-1">
+                        Format: {selectedStoredHandshake.file_format} | 
+                        Taille: {(selectedStoredHandshake.file_size / 1024).toFixed(2)} KB
+                      </p>
+                      {selectedStoredHandshake.deauth_sent && (
+                        <p className="text-xs text-[#10b981] font-mono mt-1">✓ Déauthentification effectuée</p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setSelectedStoredHandshake(null)}
+                      className="px-2 py-1 text-xs rounded border border-[#ef4444] text-[#ef4444] hover:bg-[#ef4444]/10 font-mono font-bold transition"
+                    >
+                      ✕ Effacer
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Workflow Quick Steps */}
               <div className="rounded-lg border border-[#2a2f4a] bg-[#151a3a] p-4">

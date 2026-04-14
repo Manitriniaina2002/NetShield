@@ -3,6 +3,7 @@ import React from 'react'
 const NAV_ITEMS = [
   { id: 'overview', label: 'Vue d\'ensemble' },
   { id: 'kismet', label: 'Kismet' },
+  { id: 'handshake', label: 'Capture de Handshake' },
   { id: 'vulnerabilities', label: 'Vulnérabilités' },
   { id: 'recommendations', label: 'Recommandations' },
   { id: 'cracking', label: 'Craquage' },
@@ -63,6 +64,18 @@ function TabIcon({ id }) {
         <rect x="4" y="11" width="16" height="10" rx="2" />
         <path d="M8 11V8a4 4 0 018 0v3" />
         <path d="M12 15v2" />
+      </svg>
+    )
+  }
+
+  if (id === 'handshake') {
+    return (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={base} aria-hidden="true">
+        <path d="M10 10c0 2-2 4-4 4s-4-2-4-4 2-4 4-4 4 2 4 4z" />
+        <path d="M14 10c0 2 2 4 4 4s4-2 4-4-2-4-4-4-4 2-4 4z" />
+        <path d="M6 14v4" />
+        <path d="M18 14v4" />
+        <path d="M12 18v3" />
       </svg>
     )
   }

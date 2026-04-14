@@ -39,8 +39,15 @@ const normalizeCrackingMethod = (method) => {
 
 export const wifiAPI = {
   // Scan Wi-Fi
-  scanNetworks: (duration = 10, name = 'Audit Scan') =>
-    api.post('/scan/networks', null, { params: { duration, name } }),
+  scanNetworks: (duration = 10, name = 'Audit Scan', includeDemoData = true, includeDemoFailed = false) =>
+    api.post('/scan/networks', null, {
+      params: {
+        duration,
+        name,
+        include_demo_data: includeDemoData,
+        include_demo_failed: includeDemoFailed
+      }
+    }),
   
   getNetworkDetails: (bssid, channel = 6) =>
     api.get(`/scan/networks/${bssid}`, { params: { channel } }),
@@ -90,12 +97,13 @@ export const wifiAPI = {
   getCrackingMethods: () =>
     api.get('/cracking/methods'),
   
-  startCrackingJob: (networkBssid, method = 'aircrack-ng', wordlist = 'academic', gpuEnabled = false) =>
+  startCrackingJob: (networkBssid, method = 'aircrack-ng', wordlist = 'academic', gpuEnabled = false, handshakeId = null) =>
     api.post('/cracking/start', {
       network_bssid: networkBssid,
       method: normalizeCrackingMethod(method),
       wordlist,
-      gpu_enabled: gpuEnabled
+      gpu_enabled: gpuEnabled,
+      handshake_id: handshakeId
     }),
   
   getJobStatus: (jobId) =>
@@ -111,7 +119,56 @@ export const wifiAPI = {
     api.post(`/cracking/job/${jobId}/cancel`),
   
   getHandshakeCaptureGuide: () =>
-    api.get('/cracking/handshake-capture-guide')
+    api.get('/cracking/handshake-capture-guide'),
+
+  // Handshake Capture
+  startHandshakeCapture: (network, duration = 60, enableDeauth = false, deauthCount = 5) =>
+    api.post('/handshake/capture/start', { network, duration, enable_deauth: enableDeauth, deauth_count: deauthCount }),
+  
+  getHandshakeCaptureStatus: (captureId) =>
+    api.get(`/handshake/capture/status/${captureId}`),
+  
+  listActiveCaptures: () =>
+    api.get('/handshake/capture/list'),
+  
+  cancelCapture: (captureId) =>
+    api.post(`/handshake/capture/cancel/${captureId}`),
+  
+  getAvailableWiFiInterfaces: () =>
+    api.get('/handshake/interfaces'),
+  
+  useCaptureForcCracking: (captureId, passwordList = null, crackingMethod = 'aircrack_ng') =>
+    api.post(`/handshake/capture/integrated/${captureId}`, null, { 
+      params: { 
+        password_list: passwordList,
+        cracking_method: crackingMethod
+      }
+    }),
+
+  // Stored Handshakes
+  getStoredHandshakes: (successfulOnly = false, limit = 100) =>
+    api.get('/stored/handshakes', { params: { successful_only: successfulOnly, limit } }),
+  
+  getStoredHandshakesByNetwork: (bssid, successfulOnly = false) =>
+    api.get(`/stored/handshakes/network/${bssid}`, { params: { successful_only: successfulOnly } }),
+  
+  getStoredHandshakeDetails: (captureId) =>
+    api.get(`/stored/handshakes/${captureId}`),
+  
+  getStoredHandshakeCrackingHistory: (captureId) =>
+    api.get(`/stored/handshakes/${captureId}/cracking-history`),
+  
+  getStoredHandshakeStatistics: () =>
+    api.get('/stored/statistics'),
+  
+  getSuccessfulCracksForNetwork: (bssid) =>
+    api.get(`/stored/cracking-results/network/${bssid}`),
+  
+  deleteStoredHandshake: (captureId) =>
+    api.delete(`/stored/handshakes/${captureId}`),
+  
+  cleanupOldCaptures: (daysOld = 30) =>
+    api.post('/stored/cleanup/old-captures', { days_old: daysOld })
 }
 
 // API Kismet pour scanning avancé

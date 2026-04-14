@@ -15,13 +15,19 @@ class CommandExecutionService:
 
     # Commandes logiques exposees a l'UI/API.
     ALLOWED_COMMANDS = {
-        # Commandes réseau
+        # Commandes réseau (cross-platform)
         "ifconfig": "Afficher les interfaces reseau",
         "ip": "Commandes reseau avancees",
+        "ipconfig": "Afficher configuration IP (Windows)",
+        "netsh": "Commandes reseau avancees (Windows)",
         
         # Commandes Wi-Fi scanning (Linux)
         "airmon-ng": "Activer/desactiver le mode monitor (Linux)",
         "airodump-ng": "Scanner les reseaux Wi-Fi (Linux)",
+        
+        # Commandes Wi-Fi (Windows)
+        "netsh_wlan_show": "Afficher reseaux Wi-Fi (Windows)",
+        "netsh_wlan_interfaces": "Afficher interfaces Wi-Fi (Windows)",
         
         # Commandes de craquage (requires powerful hardware)
         "aircrack-ng": "Craquage WEP/WPA/WPA2 (Linux/macOS)",
@@ -31,6 +37,8 @@ class CommandExecutionService:
         # Commandes système
         "ps": "Lister les processus",
         "kill": "Terminer un processus",
+        "tasklist": "Lister les processus (Windows)",
+        "taskkill": "Terminer un processus (Windows)",
     }
 
     # Sessions authentifiees: session_id -> metadata
@@ -228,12 +236,21 @@ class CommandExecutionService:
                 "ip": "netsh",
                 "ps": "tasklist",
                 "kill": "taskkill",
+                "netsh_wlan_show": "netsh",
+                "netsh_wlan_interfaces": "netsh",
             }
 
             if command in {"airmon-ng", "airodump-ng"}:
                 raise ValueError(
                     f"La commande '{command}' est disponible uniquement sous Linux avec aircrack-ng."
                 )
+
+            # Handle Windows WiFi-specific commands
+            if command == "netsh_wlan_show":
+                return "netsh", ["wlan", "show", "networks", "mode=Bssid"]
+            
+            if command == "netsh_wlan_interfaces":
+                return "netsh", ["wlan", "show", "interfaces"]
 
             executable = windows_map.get(command, command)
 
@@ -261,6 +278,12 @@ class CommandExecutionService:
                         f"La commande '{command}' est introuvable. Installez la suite aircrack-ng."
                     )
                 raise ValueError(f"Commande introuvable sur ce systeme: {command}")
+
+        # Linux/Mac specific WiFi commands - not on Windows
+        if command in {"netsh_wlan_show", "netsh_wlan_interfaces"}:
+            raise ValueError(
+                f"La commande '{command}' est disponible uniquement sous Windows."
+            )
 
         return command, normalized_args
 

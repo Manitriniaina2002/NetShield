@@ -6,6 +6,7 @@ import RecommendationPanel from './RecommendationPanel'
 import CommandPanel from './CommandPanel'
 import CrackingPanel from './CrackingPanel'
 import KismetPanel from './KismetPanel'
+import HandshakeCapturePanel from './HandshakeCapturePanel'
 import { NavBar } from './NavBar'
 import { Button } from './ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card'
@@ -419,6 +420,11 @@ export function Dashboard() {
               }}
               onChangeUrl={setKismetUrl}
             />
+          )}
+
+          {/* Handshake Capture Tab */}
+          {activeTab === 'handshake' && (
+            <HandshakeCapturePanel networks={getUnifiedNetworks()} />
           )}
 
           {/* Vulnerabilities Tab */}

@@ -45,6 +45,8 @@ class CrackingJob(BaseModel):
     attempts: int = 0
     error_message: Optional[str] = None
     gpu_enabled: bool = False
+    expected_outcome: Optional[str] = None  # success | fail | None
+    expected_reason: Optional[str] = None
     
     class Config:
         json_encoders = {
@@ -61,6 +63,17 @@ class CrackingService:
         "common": {"size": 1200, "path": None},  # Généré localement
         "academic": {"size": 5000, "path": None},  # Généré localement
     }
+
+    # Mots de passe attendus pour le flux demo (par BSSID)
+    DEMO_EXPECTED_PASSWORDS = {
+        "BB:CC:DD:EE:FF:02": "Butterfly2024!",  # HomeWifi-Plus
+        "AA:BB:CC:DD:EE:01": "SecurePass123!",  # Corporate demo
+        "DD:EE:FF:00:11:04": "5A6F6E6173",      # Legacy WEP demo
+    }
+
+    DEMO_EXPECTED_FAILURES = {
+        "FF:00:11:22:33:06": "Reseau demo securise (WPA3 fort): echec attendu."
+    }
     
     # Jobs actifs: job_id -> CrackingJob
     ACTIVE_JOBS: Dict[str, CrackingJob] = {}
@@ -76,17 +89,59 @@ class CrackingService:
     }
     
     @staticmethod
-    def _is_tool_available(tool_name: str) -> bool:
-        """Vérifie si un outil est disponible sur le système."""
+    def _wsl_available() -> bool:
+        """Vérifie si WSL2 est disponible sur Windows."""
+        if os.name != "nt":
+            return False
         try:
             result = subprocess.run(
-                ["which" if os.name != "nt" else "where", tool_name],
+                ["wsl", "--list", "--verbose"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 timeout=5,
                 check=False,
             )
             return result.returncode == 0
+        except Exception:
+            return False
+
+    @staticmethod
+    def _is_tool_available_in_wsl(tool_name: str) -> bool:
+        """Vérifie si un outil est disponible dans WSL."""
+        if not CrackingService._wsl_available():
+            return False
+        try:
+            result = subprocess.run(
+                ["wsl", "which", tool_name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+                check=False,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
+    @staticmethod
+    def _is_tool_available(tool_name: str) -> bool:
+        """Vérifie si un outil est disponible sur le système (Windows ou WSL)."""
+        try:
+            # D'abord vérifier Windows natif (pour hashcat, etc.)
+            result = subprocess.run(
+                ["where" if os.name == "nt" else "which", tool_name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+                check=False,
+            )
+            if result.returncode == 0:
+                return True
+            
+            # Si sur Windows et pas trouvé, vérifier WSL
+            if os.name == "nt":
+                return CrackingService._is_tool_available_in_wsl(tool_name)
+            
+            return False
         except Exception:
             return False
     
@@ -144,6 +199,16 @@ class CrackingService:
         """
         job_id = str(uuid.uuid4())[:8]
         
+        bssid_upper = (network.bssid or "").upper()
+        expected_outcome = None
+        expected_reason = None
+        if bssid_upper in CrackingService.DEMO_EXPECTED_PASSWORDS:
+            expected_outcome = "success"
+            expected_reason = "Mot de passe de démonstration attendu si présent dans le dictionnaire."
+        elif bssid_upper in CrackingService.DEMO_EXPECTED_FAILURES:
+            expected_outcome = "fail"
+            expected_reason = CrackingService.DEMO_EXPECTED_FAILURES[bssid_upper]
+
         job = CrackingJob(
             job_id=job_id,
             network_bssid=network.bssid,
@@ -154,6 +219,8 @@ class CrackingService:
             wordlist_size=CrackingService.WORDLISTS.get(wordlist, {}).get("size", 0),
             wordlist_name=wordlist,
             gpu_enabled=gpu_enabled and method == CrackingMethod.HASHCAT,
+            expected_outcome=expected_outcome,
+            expected_reason=expected_reason,
         )
         
         CrackingService.ACTIVE_JOBS[job_id] = job
@@ -171,11 +238,19 @@ class CrackingService:
         Linux optimisé: Subprocess direct sans overhead
         Returns immédiatement avec job_id pour polling
         """
+        settings = get_settings()
         job.status = "running"
         job.start_time = datetime.now()
+
+        use_simulation = settings.simulation_mode or CrackingService._is_demo_network(job)
         
         # Créer une task asyncio pour exécuter le craquage en arrière-plan
-        if job.method == CrackingMethod.AIRCRACK_NG:
+        if use_simulation:
+            if job.method == CrackingMethod.HASHCAT:
+                task = asyncio.create_task(CrackingService._simulate_hashcat(job, wordlist_path))
+            else:
+                task = asyncio.create_task(CrackingService._simulate_aircrack(job, wordlist_path))
+        elif job.method == CrackingMethod.AIRCRACK_NG:
             task = asyncio.create_task(
                 CrackingService._run_real_aircrack(job, handshake_file, wordlist_path)
             )
@@ -201,6 +276,39 @@ class CrackingService:
             "message": f"Craquage lancé en arrière-plan sur {job.method.value}",
             "poll_url": f"/api/cracking/job/{job.job_id}"
         }
+
+    @staticmethod
+    def _is_demo_network(job: CrackingJob) -> bool:
+        """Détecte si le job cible un réseau de démonstration."""
+        if (job.network_bssid or "").upper() in CrackingService.DEMO_EXPECTED_PASSWORDS:
+            return True
+        ssid = (job.network_ssid or "").lower()
+        return any(k in ssid for k in ["guest", "legacy", "homewifi", "corporate", "routeradmin", "demo"])
+
+    @staticmethod
+    def _resolve_expected_demo_password(job: CrackingJob, wordlist_path: str) -> Optional[str]:
+        """Retourne le mot de passe demo si présent dans le dictionnaire sélectionné."""
+        expected = CrackingService.DEMO_EXPECTED_PASSWORDS.get((job.network_bssid or "").upper())
+        if not expected:
+            return None
+
+        # Si le chemin du dictionnaire est absent (ex: rockyou non installé),
+        # on garde un comportement déterministe pour les cibles demo de réussite.
+        if not wordlist_path:
+            return expected
+
+        if not os.path.exists(wordlist_path):
+            return None
+
+        try:
+            with open(wordlist_path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.strip() == expected:
+                        return expected
+        except Exception:
+            return None
+
+        return None
     
     @staticmethod
     async def start_aircrack_job(
@@ -232,11 +340,23 @@ class CrackingService:
             job.progress = progress
             job.attempts = int(job.wordlist_size * (progress / 100))
             await asyncio.sleep(0.5)  # Simule le délai
+
+        if job.expected_outcome == "fail":
+            job.status = "failed"
+            job.error_message = "Key not found in wordlist"
+            job.progress = 100
+            job.end_time = datetime.now()
+            return {
+                "status": "success",
+                "job_id": job.job_id,
+                "password_found": None,
+                "progress": job.progress,
+            }
         
-        # Résultat simulé : 30% de chance de trouvez le mot de passe
-        import random
-        if random.random() < 0.3:
-            job.password_found = "SecurePassword123!"
+        # Résultat simulé demo: déterministe selon le dictionnaire.
+        expected = CrackingService._resolve_expected_demo_password(job, wordlist_path)
+        if expected:
+            job.password_found = expected
             job.status = "completed"
         else:
             job.status = "failed"
@@ -261,18 +381,34 @@ class CrackingService:
         Exécute aircrack-ng en mode réel directement.
         
         Linux: Subprocess sans terminal, capture stdout/stderr directement
-        Windows: Via WSL2 ou CMD sans GUI window
+        Windows: Via WSL2 si disponible
         """
         try:
             import platform as pl
             is_linux = pl.system() == "Linux"
+            use_wsl = False
             
-            cmd = [
-                "aircrack-ng",
-                "-w", wordlist_path,
-                "-l", job.network_bssid.replace(":", ""),
-                handshake_file
-            ]
+            # Sur Windows, vérifier si WSL est disponible
+            if not is_linux and os.name == 'nt':
+                if CrackingService._wsl_available():
+                    use_wsl = True
+            
+            if use_wsl:
+                # Utiliser WSL pour exécuter aircrack-ng
+                cmd = [
+                    "wsl",
+                    "aircrack-ng",
+                    "-w", wordlist_path,
+                    "-l", job.network_bssid.replace(":", ""),
+                    handshake_file
+                ]
+            else:
+                cmd = [
+                    "aircrack-ng",
+                    "-w", wordlist_path,
+                    "-l", job.network_bssid.replace(":", ""),
+                    handshake_file
+                ]
             
             # Configuration subprocess pour éviter les fenêtres terminales
             kwargs = {
@@ -280,12 +416,15 @@ class CrackingService:
                 "stderr": asyncio.subprocess.PIPE,
             }
             
-            # Linux: Pas besoin de flags spéciaux
             # Windows: CREATE_NO_WINDOW équivalent via startupinfo
             if not is_linux and os.name == 'nt':
-                import subprocess
                 si = subprocess.STARTUPINFO()
-                si.dwFlags |= subprocess.HIDE_WINDOW
+                # HIDE_WINDOW may not be available in all Python versions
+                if hasattr(subprocess, 'HIDE_WINDOW'):
+                    si.dwFlags |= subprocess.HIDE_WINDOW
+                else:
+                    # Fallback: use the raw value (0x08)
+                    si.dwFlags |= 0x08
                 kwargs["startupinfo"] = si
             
             process = await asyncio.create_subprocess_exec(
@@ -398,11 +537,22 @@ class CrackingService:
             job.progress = progress
             job.attempts = int(job.wordlist_size * (progress / 100))
             await asyncio.sleep(0.3)
+
+        if job.expected_outcome == "fail":
+            job.status = "failed"
+            job.error_message = "Key not found in wordlist"
+            job.end_time = datetime.now()
+            return {
+                "status": "success",
+                "job_id": job.job_id,
+                "password_found": None,
+                "progress": job.progress,
+            }
         
-        # Résultat simulé : 50% de chance de trouver le mot de passe
-        import random
-        if random.random() < 0.5:
-            job.password_found = "Password@123"
+        # Résultat simulé demo: déterministe selon le dictionnaire.
+        expected = CrackingService._resolve_expected_demo_password(job, wordlist_path)
+        if expected:
+            job.password_found = expected
             job.status = "completed"
         else:
             job.status = "failed"
@@ -427,22 +577,42 @@ class CrackingService:
         Exécute hashcat en mode réel directement.
         
         Linux: Subprocess sans terminal, GPU support natif
-        Windows: Native hashcat si disponible
+        Windows: Native hashcat si disponible, sinon via WSL2
         macOS: Metal GPU support
         """
         try:
             import platform as pl
             is_linux = pl.system() == "Linux"
+            use_wsl = False
             
-            cmd = [
-                "hashcat",
-                "-m", str(hash_type),  # 2500 = WPA2-PSK, 16800 = WPA3-PSK
-                "-w", "3",  # Mode agressif
-                "--potfile-disable",  # Désactiver le cache
-                "--quiet",  # Moins de sortie verbale (Linux friendly)
-                handshake_hash,
-                wordlist_path,
-            ]
+            # Sur Windows, vérifier si WSL est disponible et hashcat natif ne l'est pas
+            if not is_linux and os.name == 'nt':
+                if not CrackingService._is_tool_available("hashcat"):
+                    if CrackingService._wsl_available():
+                        use_wsl = True
+            
+            if use_wsl:
+                # Utiliser WSL pour exécuter hashcat
+                cmd = [
+                    "wsl",
+                    "hashcat",
+                    "-m", str(hash_type),  # 2500 = WPA2-PSK, 16800 = WPA3-PSK
+                    "-w", "3",  # Mode agressif
+                    "--potfile-disable",  # Désactiver le cache
+                    "--quiet",  # Moins de sortie verbale (Linux friendly)
+                    handshake_hash,
+                    wordlist_path,
+                ]
+            else:
+                cmd = [
+                    "hashcat",
+                    "-m", str(hash_type),  # 2500 = WPA2-PSK, 16800 = WPA3-PSK
+                    "-w", "3",  # Mode agressif
+                    "--potfile-disable",  # Désactiver le cache
+                    "--quiet",  # Moins de sortie verbale (Linux friendly)
+                    handshake_hash,
+                    wordlist_path,
+                ]
             
             # Configuration subprocess pour éviter les fenêtres terminales
             kwargs = {
@@ -451,14 +621,18 @@ class CrackingService:
             }
             
             # Ajouter GPU sur Linux si disponible
-            if is_linux and job.gpu_enabled:
+            if is_linux and job.gpu_enabled and not use_wsl:
                 cmd.extend(["-d", "1"])  # GPU device 1
             
             # Windows: CREATE_NO_WINDOW
             if not is_linux and os.name == 'nt':
-                import subprocess
                 si = subprocess.STARTUPINFO()
-                si.dwFlags |= subprocess.HIDE_WINDOW
+                # HIDE_WINDOW may not be available in all Python versions
+                if hasattr(subprocess, 'HIDE_WINDOW'):
+                    si.dwFlags |= subprocess.HIDE_WINDOW
+                else:
+                    # Fallback: use the raw value (0x08)
+                    si.dwFlags |= 0x08
                 kwargs["startupinfo"] = si
             
             process = await asyncio.create_subprocess_exec(
@@ -597,6 +771,7 @@ class CrackingService:
             "wifi123", "wifipass", "networkpass", "secure123", "admin123",
             "password123", "Password123", "Password@123", "SecurePass123",
             "Welcome123", "Guest123", "User123", "Test123", "Demo123",
+            "Butterfly2024!", "Password2024", "SecurePass123!",
             "Adesolaire2025"
         ]
         
@@ -629,7 +804,10 @@ class CrackingService:
         import string
         
         if not seed_words:
-            seed_words = ["password", "admin", "user", "test", "demo", "secure"]
+            seed_words = [
+                "password", "admin", "user", "test", "demo", "secure",
+                "Butterfly2024!", "Password2024", "SecurePass123!"
+            ]
         
         passwords = set(seed_words)
         

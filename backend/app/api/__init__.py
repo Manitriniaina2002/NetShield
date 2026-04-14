@@ -7,6 +7,9 @@ from .reports import router as reports_router
 from .commands import router as commands_router
 from .cracking import router as cracking_router
 from .kismet import router as kismet_router
+from .handshake import router as handshake_router
+from .stored_handshakes import router as stored_handshakes_router
+from .demo_workflow import router as demo_workflow_router
 
 # Créer le routeur API principal
 api_router = APIRouter()
@@ -19,5 +22,8 @@ api_router.include_router(reports_router)
 api_router.include_router(commands_router)
 api_router.include_router(cracking_router)
 api_router.include_router(kismet_router)
+api_router.include_router(handshake_router)
+api_router.include_router(stored_handshakes_router)
+api_router.include_router(demo_workflow_router)
 
 __all__ = ["api_router"]
