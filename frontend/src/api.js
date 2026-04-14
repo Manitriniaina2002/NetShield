@@ -1,6 +1,17 @@
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8000/api'
+// Use environment variable for API base URL, fallback to localhost for development
+const getApiBaseUrl = () => {
+  // Check for Vite environment variable
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL + '/api'
+  }
+  
+  // Development fallback
+  return 'http://localhost:8000/api'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 const api = axios.create({
   baseURL: API_BASE_URL,

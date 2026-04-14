@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: netshield-backend
+    runtime: python
+    pythonVersion: 3.11
+    
+    plan: free # or "starter", "standard", etc.
+    
+    repo: https://github.com/yourusername/NetShield # Update with your repo
+    region: oregon # Choose your preferred region
+    
+    buildCommand: |
+      pip install -r requirements.txt
+    
+    startCommand: |
+      uvicorn main:app --host 0.0.0.0 --port $PORT
+    
+    envVars:
+      - key: SIMULATION_MODE
+        value: "false"
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: BACKEND_PORT
+        scope: config
+        value: $PORT
+      - key: CORS_ORIGINS
+        value: |
+          [
+            "https://yourdomain.vercel.app",
+            "http://localhost:3000",
+            "http://localhost:5173"
+          ]
+      - key: COMPANY_NAME
+        value: "NetShield Labs"
+    
+    healthCheckPath: /api/health

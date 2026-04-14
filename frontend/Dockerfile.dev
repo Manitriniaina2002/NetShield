@@ -1,0 +1,16 @@
+# Development Dockerfile for Frontend
+# Used in docker-compose for local development
+
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm install
+
+COPY . .
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev"]
