@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 import asyncio
+import logging
 from sqlalchemy.orm import Session
 
 from app.services.cracking import (
@@ -15,6 +16,7 @@ from app.services.database_service import DatabaseService
 from app.config import get_settings
 from app.models.database import get_db_engine, get_session_maker
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/cracking", tags=["Cracking"])
 
 
@@ -109,6 +111,8 @@ async def start_cracking_job(request: StartCrackingRequest, db: Session = Depend
         - Mode réel: requiert aircrack-ng/hashcat installé
         - Pas de limite de job actifs, mais surveillance mémoire
     """
+    logger.debug(f"Start cracking request: network_bssid={request.network_bssid}, method={request.method}, wordlist={request.wordlist}")
+    
     settings = get_settings()
     
     # En mode réel, vérifier l'authentification (TODO: intégrer avec CommandExecutionService)
@@ -116,7 +120,7 @@ async def start_cracking_job(request: StartCrackingRequest, db: Session = Depend
         # À implémenter: vérifier les privilèges admin
         pass
     
-    # Récupérer le chemin du fichier handshake
+    # Récupérerlutionlechemin du fichier handshake
     handshake_file = "/tmp/capture.cap"
     handshake_db_id = None
     network_ssid = f"Network_{request.network_bssid.replace(':', '')[-6:]}"
@@ -130,9 +134,10 @@ async def start_cracking_job(request: StartCrackingRequest, db: Session = Depend
             handshake_db_id = handshake.id
             network_ssid = handshake.network_ssid or network_ssid
         except Exception as e:
+            logger.error(f"Error retrieving handshake: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Erreur lors de la récupération du handshake: {str(e)}")
     
-    # Chercher le réseau
+    # Chercher le réseau et lancer le craquage
     try:
         # Pour l'API, on crée simplement le job
         # La vraie implémentation cherche le réseau scannés
@@ -192,8 +197,11 @@ async def start_cracking_job(request: StartCrackingRequest, db: Session = Depend
             "message": "Craquage lancé directement en arrière-plan sans terminal. Utilisez /api/cracking/job/{job_id} pour monitorer",
             "poll_url": f"/api/cracking/job/{job.job_id}"
         }
-    
+    except ValueError as ve:
+        logger.error(f"Validation error in cracking start: {str(ve)}")
+        raise HTTPException(status_code=422, detail=f"Validation error: {str(ve)}")
     except Exception as e:
+        logger.error(f"Error in cracking start: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -320,7 +328,7 @@ async def get_cracking_methods():
         Dict des méthodes avec détails
     """
     return {
-        "aircrack_ng": {
+        "aircrack-ng": {
             "name": "Aircrack-ng",
             "description": "Craquage WEP/WPA/WPA2 par dictionnaire et force brute",
             "speed": "Lent mais fiable",
@@ -341,7 +349,7 @@ async def get_cracking_methods():
             "best_for": "Productions, tests de performance",
             "tutorial": "https://hashcat.net/wiki/"
         },
-        "john_ripper": {
+        "john": {
             "name": "John the Ripper",
             "description": "Craquage polyvalent WPA/WPA2",
             "speed": "Modéré",

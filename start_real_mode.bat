@@ -110,16 +110,16 @@ if errorlevel 1 (
 )
 echo [✓] Dependencies installed
 
-REM Start Backend with Real Mode
+REM Start Backend with Real Mode (exposed on network)
 echo.
 echo [3/4] Starting Backend in REAL MODE...
 echo.
 echo Launching: python main.py
-echo Environment: SIMULATION_MODE=false
+echo Environment: SIMULATION_MODE=false, BACKEND_HOST=0.0.0.0
 echo.
 timeout /t 2 /nobreak
 
-start "NetShield Backend - Real Mode" cmd /k "set SIMULATION_MODE=false& python main.py"
+start "NetShield Backend - Real Mode" cmd /k "set SIMULATION_MODE=false& set BACKEND_HOST=0.0.0.0& set BACKEND_PORT=8000& python main.py"
 if errorlevel 1 (
     echo ❌ ERROR: Failed to start backend
     pause
@@ -147,22 +147,27 @@ echo.
 echo [✓] Frontend dependencies ready
 echo.
 echo ============================================================================
-echo ✅ NetShield Real Mode Started Successfully!
+echo SUCCESSFUL: NetShield Real Mode Started
 echo ============================================================================
 echo.
-echo 🌐 Frontend: http://localhost:3000
-echo 🔌 Backend:  http://localhost:8000/api/docs
+echo Local Access:
+echo   Frontend: http://localhost:3000
+echo   Backend:  http://localhost:8000/api/docs
 echo.
-echo ⚠️  REAL MODE ACTIVE:
-echo   - WiFi scanning will use REAL SYSTEM COMMANDS
-echo   - Admin privileges are ACTIVE
-echo   - Commands execute on your actual network adapter
+echo Network Access:
+echo   Your network IP is displayed in the app header
+echo   Use it to access from other devices on your network
 echo.
-echo 🛑 To stop: Close both terminal windows
+echo REAL MODE ACTIVE:
+echo   - WiFi scanning uses REAL SYSTEM COMMANDS
+echo   - Admin privileges ACTIVE
+echo   - App is exposed on local network
+echo.
+echo To stop: Close both terminal windows
 echo.
 timeout /t 3 /nobreak
 
-REM Start Frontend (keep terminal open)
-npm run dev
+REM Start Frontend with network exposure
+npm run dev -- --host 0.0.0.0
 
 setlocal disableendexpansion

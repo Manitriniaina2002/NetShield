@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Query, HTTPException, Depends
 from typing import List
 import platform
+import logging
 from app.models.wifi import WiFiNetwork
 from app.models.wifi import SecurityLevel
 from app.models.scan import ScanResult
@@ -12,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.models.database import get_db_engine, get_session_maker
 from app.services.database_service import DatabaseService
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/scan", tags=["WiFi Scan"])
 
 
@@ -115,8 +117,9 @@ async def scan_networks(
                 scan_mode = "real"
             except Exception as real_error:
                 # Fallback à la simulation avec message d'erreur
-                error_msg = f"Real mode error: {str(real_error)}"
+                error_msg = f"Real scan failed: {str(real_error)}"
                 print(f"[SCAN ERROR] {error_msg}")
+                logger.error(f"Real WiFi scan error: {real_error}")
                 networks = await WiFiScanService._scan_networks_simulated(duration_seconds=duration)
                 scan_mode = "simulation_fallback"
         else:
@@ -221,3 +224,64 @@ async def sort_networks(
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/debug/wifi-adapters")
+async def debug_wifi_adapters():
+    """
+    Debug endpoint - Check WiFi adapter status and real scan capability
+    """
+    system_name = platform.system().lower()
+    adapters_info = {
+        "system": system_name,
+        "simulation_mode": get_settings().simulation_mode,
+        "adapters": []
+    }
+    
+    try:
+        if system_name == "windows":
+            # Check for netsh Wi-Fi adapters
+            output = await WiFiScanService._run_command(
+                ["netsh", "wlan", "show", "interfaces"],
+                timeout=10
+            )
+            adapters_info["raw_output"] = output
+            adapters_info["netsh_available"] = True
+            
+            # Try a test scan
+            try:
+                networks = await WiFiScanService._scan_networks_real(5)
+                adapters_info["real_scan_works"] = True
+                adapters_info["networks_found"] = len(networks)
+                adapters_info["sample_networks"] = [
+                    {"ssid": n.ssid, "bssid": n.bssid, "security": n.security.value}
+                    for n in networks[:3]
+                ]
+            except Exception as test_error:
+                adapters_info["real_scan_works"] = False
+                adapters_info["real_scan_error"] = str(test_error)
+                
+        elif system_name == "linux":
+            adapters_info["check_commands"] = [
+                "iwconfig",  # Show wireless interfaces
+                "iw dev",    # Show WiFi devices
+                "nmcli device wifi list"  # List available networks
+            ]
+    except Exception as e:
+        adapters_info["error"] = str(e)
+    
+    return adapters_info
+
+
+@router.get("/debug/system-info")
+async def debug_system_info():
+    """Debug endpoint - System and configuration info"""
+    settings = get_settings()
+    return {
+        "system": platform.system(),
+        "system_version": platform.version(),
+        "python_version": platform.python_version(),
+        "simulation_mode": settings.simulation_mode,
+        "backend_host": settings.backend_host,
+        "backend_port": settings.backend_port,
+    }

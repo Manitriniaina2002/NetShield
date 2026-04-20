@@ -33,8 +33,21 @@ export function Dashboard() {
   const [reportMode, setReportMode] = useState(false)
   const [toast, setToast] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [selectedCapture, setSelectedCapture] = useState(null)
   const hasInitialized = useRef(false)
   const logoSrc = '/logo-netshield.png'
+
+  // Handle capture selection for cracking
+  const handleCaptureForCracking = (capture) => {
+    setSelectedCapture(capture)
+    setSelectedNetwork({
+      ssid: capture.network_ssid,
+      bssid: capture.network_bssid,
+      security: 'WPA2' // Default, can be enhanced with capture metadata
+    })
+    setActiveTab('cracking')
+    showToast(`Handshake de "${capture.network_ssid}" prêt pour le cracking`, 'success')
+  }
 
   // Effectuer un scan réel au démarrage
   useEffect(() => {
@@ -380,7 +393,10 @@ export function Dashboard() {
 
           {/* Handshake Capture Tab */}
           {activeTab === 'handshake' && (
-            <HandshakeCapturePanel networks={getUnifiedNetworks()} />
+            <HandshakeCapturePanel 
+              networks={getUnifiedNetworks()} 
+              onCaptureForCracking={handleCaptureForCracking}
+            />
           )}
 
           {/* Vulnerabilities Tab */}
@@ -395,7 +411,11 @@ export function Dashboard() {
 
           {/* Cracking Tab */}
           {activeTab === 'cracking' && (
-            <CrackingPanel selectedNetwork={selectedNetwork} vulnerabilities={vulnerabilities} />
+            <CrackingPanel 
+              selectedNetwork={selectedNetwork} 
+              vulnerabilities={vulnerabilities}
+              selectedCapture={selectedCapture}
+            />
           )}
 
           {/* Commands Tab */}

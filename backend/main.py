@@ -5,6 +5,32 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.api import api_router
 import logging
+import socket
+
+# Configuration du logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+def get_network_ip():
+    """Get the local network IP address"""
+    try:
+        # Get the IP address by connecting to an external host (Google DNS)
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        try:
+            # Fallback: get hostname and resolve it
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
+            return ip
+        except Exception:
+            return "127.0.0.1"
 
 # Configuration du logging
 logging.basicConfig(
@@ -25,13 +51,15 @@ app = FastAPI(
 # Récupérer les paramètres
 settings = get_settings()
 
-# Configuration CORS
+# Configuration CORS - Allow all origins for network access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origin_regex="https?://.*",  # Match http:// and https://
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
 
@@ -43,6 +71,13 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
     logger.info(f"Response status: {response.status_code}")
     return response
+
+
+# Explicit OPTIONS handler for CORS preflight
+@app.options("/{full_path:path}")
+async def preflight_handler(full_path: str):
+    """Handle CORS preflight requests"""
+    return {}
 
 
 # Routes principales
@@ -64,6 +99,29 @@ async def health_check():
         "status": "healthy",
         "app_name": settings.app_name,
         "version": settings.app_version,
+        "simulation_mode": settings.simulation_mode
+    }
+
+
+@app.get("/api/network-info")
+async def network_info(request: Request):
+    """Retourne les informations de connexion réseau"""
+    network_ip = get_network_ip()
+    # Get host from request if available
+    client_host = request.headers.get("host", "localhost:8000")
+    
+    return {
+        "network_ip": network_ip,
+        "network_port": settings.backend_port,
+        "localhost_ip": "127.0.0.1",
+        "localhost_port": settings.backend_port,
+        "access_urls": {
+            "local": f"http://localhost:{settings.backend_port}",
+            "local_ip": f"http://127.0.0.1:{settings.backend_port}",
+            "network": f"http://{network_ip}:{settings.backend_port}",
+            "frontend_local": "http://localhost:3000",
+            "frontend_network": f"http://{network_ip}:3000"
+        },
         "simulation_mode": settings.simulation_mode
     }
 

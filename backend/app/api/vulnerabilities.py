@@ -1,5 +1,6 @@
 """Routes API pour l'analyse des vulnerabilites."""
 from typing import List
+import logging
 
 from fastapi import APIRouter, HTTPException
 
@@ -7,6 +8,7 @@ from app.models.vulnerability import Vulnerability
 from app.models.wifi import WiFiNetwork
 from app.services.vulnerability_analysis import VulnerabilityAnalysisService
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/vulnerabilities", tags=["Vulnerabilities"])
 
 
@@ -66,7 +68,10 @@ async def get_cracking_strategy(bssid: str, network: WiFiNetwork):
         Dict avec stratégie de craquage, outils recommandés et paramètres
     """
     try:
+        logger.debug(f"Cracking strategy request - BSSID: {bssid}, Network: {network.dict()}")
+        
         if network.bssid.upper() != bssid.upper():
+            logger.warning(f"BSSID mismatch: URL={bssid}, Body={network.bssid}")
             raise HTTPException(
                 status_code=400,
                 detail="Le BSSID fourni dans l'URL ne correspond pas au réseau envoyé.",
@@ -84,7 +89,11 @@ async def get_cracking_strategy(bssid: str, network: WiFiNetwork):
     
     except HTTPException:
         raise
+    except ValueError as ve:
+        logger.error(f"Validation error in cracking strategy: {str(ve)}")
+        raise HTTPException(status_code=422, detail=f"Validation error: {str(ve)}")
     except Exception as e:
+        logger.error(f"Error in cracking strategy: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

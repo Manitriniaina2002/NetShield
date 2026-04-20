@@ -6,7 +6,7 @@ import { Progress } from './ui/progress';
 import { Badge } from './ui/badge';
 import { cn } from '../lib/utils';
 
-export const HandshakeCapturePanel = ({ networks = [] }) => {
+export const HandshakeCapturePanel = ({ networks = [], onCaptureForCracking }) => {
   const [selectedNetwork, setSelectedNetwork] = useState(null);
   const [duration, setDuration] = useState(60);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -157,9 +157,12 @@ export const HandshakeCapturePanel = ({ networks = [] }) => {
   };
 
   const useCaptureForCracking = (capture) => {
-    // Intégration avec le composant de cracking
-    console.log('Utiliser la capture pour le cracking:', capture);
-    // À implémenter: passer les données au composant de cracking
+    // Pass the capture to the cracking workflow
+    if (onCaptureForCracking) {
+      onCaptureForCracking(capture)
+    } else {
+      console.warn('onCaptureForCracking callback not provided')
+    }
   };
 
   const getStatusColor = (status) => {

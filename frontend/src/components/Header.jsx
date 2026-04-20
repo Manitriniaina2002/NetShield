@@ -1,11 +1,29 @@
-﻿import React, { useState } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { systemAPI } from '../api'
 
 export function Header() {
   const [showLegal, setShowLegal] = useState(false)
+  const [networkInfo, setNetworkInfo] = useState(null)
   const logoSrc = '/logo-netshield.png'
+
+  useEffect(() => {
+    const fetchNetworkInfo = async () => {
+      try {
+        const response = await systemAPI.getNetworkInfo()
+        setNetworkInfo(response.data)
+      } catch (error) {
+        console.error('Failed to fetch network info:', error)
+      }
+    }
+
+    fetchNetworkInfo()
+    // Refresh network info every 30 seconds
+    const interval = setInterval(fetchNetworkInfo, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <>
@@ -48,6 +66,28 @@ export function Header() {
                 <div className="w-2 h-2 rounded-full bg-accent-600 animate-pulse"></div>
                 <span className="text-sm font-medium text-accent-700">Active</span>
               </div>
+
+              {/* Network Info Display */}
+              {networkInfo && (
+                <div className="hidden lg:flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50/50 border border-blue-200/50 group relative cursor-help">
+                  <svg className="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                  <span className="text-xs font-medium text-blue-700 hidden sm:inline">
+                    📡 {networkInfo.network_ip}
+                  </span>
+                  
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full right-0 mb-2 w-64 bg-slate-900 text-white text-xs rounded-lg p-3 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
+                    <p className="font-semibold mb-2">🌐 Network Access URLs:</p>
+                    <div className="space-y-1 font-mono text-[11px]">
+                      <p>Frontend: <span className="text-blue-300">http://{networkInfo.network_ip}:3000</span></p>
+                      <p>Backend: <span className="text-blue-300">http://{networkInfo.network_ip}:8000</span></p>
+                      <p className="text-slate-400 mt-1">Use these URLs to access from other devices on your network</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Legal Button */}
               <button

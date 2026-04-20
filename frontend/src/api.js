@@ -1,14 +1,19 @@
 import axios from 'axios'
 
-// Use environment variable for API base URL, fallback to localhost for development
+// Dynamically determine API base URL based on current location
 const getApiBaseUrl = () => {
   // Check for Vite environment variable
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL + '/api'
   }
   
-  // Development fallback
-  return 'http://localhost:8000/api'
+  // Use the same host/IP that serves the frontend
+  // This ensures network access works correctly
+  const protocol = window.location.protocol
+  const hostname = window.location.hostname
+  const port = 8000
+  
+  return `${protocol}//${hostname}:${port}/api`
 }
 
 const API_BASE_URL = getApiBaseUrl()
@@ -38,14 +43,21 @@ api.interceptors.response.use(
 
 const normalizeCrackingMethod = (method) => {
   const aliases = {
-    aircrack_ng: 'aircrack-ng',
+    // Uppercase enum-style keys
+    'AIRCRACK_NG': 'aircrack-ng',
+    'HASHCAT': 'hashcat',
+    'JOHN': 'john',
+    // Underscore variants
+    'aircrack_ng': 'aircrack-ng',
+    'john_ripper': 'john',
+    // Hyphen variants
     'aircrack-ng': 'aircrack-ng',
-    hashcat: 'hashcat',
-    john_ripper: 'john',
-    john: 'john'
+    // Direct match
+    'hashcat': 'hashcat',
+    'john': 'john'
   }
 
-  return aliases[method] || method
+  return aliases[method] || method.toLowerCase().replace(/_/g, '-')
 }
 
 export const wifiAPI = {
@@ -203,6 +215,17 @@ export const kismetAPI = {
   // Récupérer le statut du serveur Kismet
   getStatus: (kismetUrl = 'http://localhost:2501') =>
     api.get('/kismet/status', { params: { kismet_url: kismetUrl } })
+}
+
+// System & Network Info API
+export const systemAPI = {
+  // Get network connection information
+  getNetworkInfo: () =>
+    api.get('/network-info'),
+  
+  // Get app info
+  getAppInfo: () =>
+    api.get('/info')
 }
 
 export default api

@@ -154,7 +154,7 @@ class CrackingService:
     def get_available_methods() -> Dict[str, Any]:
         """Retourne les méthodes et outils disponibles."""
         return {
-            "aircrack_ng": {
+            "aircrack-ng": {
                 "available": CrackingService._is_tool_available("aircrack-ng"),
                 "description": "Craquage de clés WEP/WPA/WPA2 par force brute",
                 "requires": ["airodump-ng", "aircrack-ng"],
@@ -169,7 +169,7 @@ class CrackingService:
                 "speed": "Ultra-rapide avec GPU",
                 "gpu_support": True,
             },
-            "john_ripper": {
+            "john": {
                 "available": CrackingService._is_tool_available("john"),
                 "description": "John the Ripper - Craquage polyvalent",
                 "requires": ["john"],

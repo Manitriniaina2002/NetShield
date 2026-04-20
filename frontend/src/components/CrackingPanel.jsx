@@ -31,17 +31,24 @@ const WORKFLOW_STEPS = [
   }
 ]
 
-function CrackingPanel({ selectedNetwork, vulnerabilities }) {
+function CrackingPanel({ selectedNetwork, vulnerabilities, selectedCapture }) {
   const normalizeMethodId = (methodId) => {
     const aliases = {
-      aircrack_ng: 'aircrack-ng',
+      // Uppercase enum-style keys
+      'AIRCRACK_NG': 'aircrack-ng',
+      'HASHCAT': 'hashcat',
+      'JOHN': 'john',
+      // Underscore variants
+      'aircrack_ng': 'aircrack-ng',
+      'john_ripper': 'john',
+      // Hyphen variants
       'aircrack-ng': 'aircrack-ng',
-      hashcat: 'hashcat',
-      john_ripper: 'john',
-      john: 'john'
+      // Direct match
+      'hashcat': 'hashcat',
+      'john': 'john'
     }
 
-    return aliases[methodId] || methodId
+    return aliases[methodId] || methodId.toLowerCase().replace(/_/g, '-')
   }
 
   const [crackingJobs, setCrackingJobs] = useState([])
@@ -103,6 +110,25 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
       return () => clearInterval(interval)
     }
   }, [crackingJobs])
+
+  // Handle selected capture for cracking
+  useEffect(() => {
+    if (selectedCapture) {
+      // Create a handshake object from the capture
+      const handshakeFromCapture = {
+        id: selectedCapture.capture_id,
+        capture_id: selectedCapture.capture_id,
+        ssid: selectedCapture.network_ssid,
+        bssid: selectedCapture.network_bssid,
+        file_format: 'cap', // Default format for captured handshakes
+        file_size: 0, // Will be determined after capture is processed
+        deauth_sent: selectedCapture.deauth_enabled ? selectedCapture.deauth_sent : false,
+        date: new Date().toISOString(),
+        is_captured_now: true // Flag to indicate this is a freshly captured handshake
+      }
+      setSelectedStoredHandshake(handshakeFromCapture)
+    }
+  }, [selectedCapture])
 
   const loadCrackingInfo = async () => {
     try {
@@ -619,7 +645,10 @@ function CrackingPanel({ selectedNetwork, vulnerabilities }) {
                 <div className="bg-gradient-to-br from-[#1a3a2a] to-[#0f2a1a] rounded-lg p-4 border border-[#2a5a3a] border-l-4 border-l-[#10b981]">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs text-[#10b981] font-mono uppercase mb-2 flex items-center gap-1"><MdSave /> Capture stockée sélectionnée</p>
+                      <p className="text-xs text-[#10b981] font-mono uppercase mb-2 flex items-center gap-1">
+                        <MdSave /> 
+                        {selectedStoredHandshake.is_captured_now ? 'Capture fraîche sélectionnée' : 'Capture stockée sélectionnée'}
+                      </p>
                       <p className="text-[#e5e7eb] font-mono font-bold">{selectedStoredHandshake.ssid}</p>
                       <p className="text-xs text-[#9ca3af] font-mono mt-1">
                         Format: {selectedStoredHandshake.file_format} | 

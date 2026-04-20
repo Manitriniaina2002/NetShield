@@ -28,14 +28,14 @@ class WiFiNetwork(BaseModel):
     """Modèle d'un réseau Wi-Fi"""
     
     id: Optional[str] = Field(default_factory=lambda: None)
-    ssid: str = Field(..., description="Nom du réseau SSID")
+    ssid: str = Field(default="Unknown", description="Nom du réseau SSID")
     bssid: str = Field(..., description="MAC address du routeur")
-    channel: int = Field(..., description="Canal Wi-Fi (1-14)")
+    channel: int = Field(default=6, description="Canal Wi-Fi (1-14)")
     frequency: Optional[str] = Field(None, description="Fréquence (2.4GHz ou 5GHz)")
-    security: SecurityLevel = Field(..., description="Type de sécurité")
-    signal_strength: int = Field(..., ge=-100, le=0, description="Force du signal en dBm")
+    security: SecurityLevel = Field(default=SecurityLevel.WPA2, description="Type de sécurité")
+    signal_strength: int = Field(default=-75, ge=-100, le=0, description="Force du signal en dBm")
     signal_percentage: Optional[int] = Field(None, description="Pourcentage de signal")
-    clients: int = Field(0, description="Nombre de clients connectés")
+    clients: int = Field(default=0, description="Nombre de clients connectés")
     last_seen: Optional[datetime] = Field(default_factory=datetime.now)
     
     @property
